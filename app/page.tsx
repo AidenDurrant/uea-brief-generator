@@ -8,7 +8,8 @@ import ASSESSMENT_METHODS from "./assessments.json";
 import TEMPLATE from "./template.json";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const LOCAL_STORAGE_KEY = "uea_brief_draft_v1";
+const DRAFT_STORAGE_KEY = "uea_brief_draft_v2";
+const DB_STORAGE_KEY = "uea_briefs_db"; // Our Mock Django Database
 
 const AI_CARD_STATES: Record<
   string,
@@ -99,7 +100,6 @@ const formatDateTime = (dateString?: string, description?: string) => {
   if (!dateString) return description || "";
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return `${dateString} ${description || ""}`.trim();
-
   const formattedDate = d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -107,7 +107,6 @@ const formatDateTime = (dateString?: string, description?: string) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-
   return description ? `${formattedDate} (${description})` : formattedDate;
 };
 
@@ -122,20 +121,7 @@ const MarkdownRenderer = ({
 }) => {
   return (
     <div className="markdown-content text-[11pt] leading-relaxed text-black">
-      <style>{`
-        /* Make sure floated images don't break out of their container */
-        .markdown-content::after {
-          content: "";
-          display: table;
-          clear: both;
-        }
-        .markdown-content img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 6px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-      `}</style>
+      <style>{`.markdown-content::after { content: ""; display: table; clear: both; } .markdown-content img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }`}</style>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -143,11 +129,7 @@ const MarkdownRenderer = ({
         components={{
           img: ({ node, src, alt, ...props }) => {
             if (!src) return null;
-
-            // Ensure TypeScript knows we are dealing with a string
             let finalSrc = src as string;
-
-            // Intercept our custom attachment scheme
             if (
               typeof src === "string" &&
               src.startsWith("attachment:") &&
@@ -156,34 +138,18 @@ const MarkdownRenderer = ({
               const imgId = src.replace("attachment:", "");
               finalSrc = images[imgId] || src;
             }
-
-            // Parse size and alignment from alt string
             let finalAlt = alt || "";
             let imgWidth: string | undefined = undefined;
-            let imgAlign = "center"; // default position
-
+            let imgAlign = "center";
             if (alt && typeof alt === "string" && alt.includes("|")) {
               const parts = alt.split("|").map((p) => p.trim());
-
-              // Check if the last part is an alignment keyword
               const lastPart = parts[parts.length - 1].toLowerCase();
-              if (["left", "right", "center"].includes(lastPart)) {
+              if (["left", "right", "center"].includes(lastPart))
                 imgAlign = parts.pop() || "center";
-              }
-
-              // If there's still a part left (besides the actual alt text), it's the width
-              if (parts.length > 1) {
-                imgWidth = parts.pop();
-              }
-
+              if (parts.length > 1) imgWidth = parts.pop();
               finalAlt = parts.join(" | ").trim();
             }
-
-            // Apply inline styles for sizing and alignment
-            const imgStyle: React.CSSProperties = {
-              width: imgWidth,
-            };
-
+            const imgStyle: React.CSSProperties = { width: imgWidth };
             if (imgAlign === "left") {
               imgStyle.float = "left";
               imgStyle.margin = "0.5rem 1.5rem 0.5rem 0";
@@ -194,7 +160,6 @@ const MarkdownRenderer = ({
               imgStyle.display = "block";
               imgStyle.margin = "1rem auto";
             }
-
             return (
               <img src={finalSrc} alt={finalAlt} style={imgStyle} {...props} />
             );
@@ -210,16 +175,7 @@ const MarkdownRenderer = ({
 function SectionHeading({ step, title }: { step: number; title: string }) {
   return (
     <div className="flex items-center gap-3 mb-6">
-      <div
-        className="flex items-center justify-center shrink-0 text-xs font-bold select-none"
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: "50%",
-          background: "#eef2ff",
-          color: "#4f46e5",
-        }}
-      >
+      <div className="flex items-center justify-center shrink-0 text-xs font-bold select-none bg-indigo-50 text-indigo-600 rounded-full w-6 h-6">
         {step}
       </div>
       <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
@@ -265,22 +221,14 @@ function VisibilityToggle({
       <button
         type="button"
         onClick={() => !checked && onChange()}
-        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${
-          checked
-            ? "bg-indigo-600 text-white shadow-md"
-            : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"
-        }`}
+        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${checked ? "bg-indigo-600 text-white shadow-md" : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"}`}
       >
         Visible
       </button>
       <button
         type="button"
         onClick={() => checked && onChange()}
-        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${
-          !checked
-            ? "bg-slate-600 text-white shadow-md"
-            : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"
-        }`}
+        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${!checked ? "bg-slate-600 text-white shadow-md" : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"}`}
       >
         Hidden
       </button>
@@ -288,49 +236,26 @@ function VisibilityToggle({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Default State Generator ──────────────────────────────────────────────────
+const getDefaultState = () => {
+  const data: Record<string, any> = {
+    assessmentType: "Prompt Portfolio",
+    groupWorkPermitted: "No",
+    groupSize: TEMPLATE.groupWorkDefault.size,
+    groupMechanics: TEMPLATE.groupWorkDefault.mechanics,
+    submissionDates: [
+      { id: Date.now(), date: "2026-05-22T15:00", description: "Code/Report" },
+    ],
+    aiPolicy: "RED",
+    ...TEMPLATE.aiPolicyDefaults,
+  };
+  TEMPLATE.headerFields.forEach((f) => (data[f.id] = f.default));
+  TEMPLATE.contentSections.forEach((f) => (data[f.id] = f.defaultText));
 
-export default function BriefGenerator() {
-  const [zoom, setZoom] = useState(80);
-  const [panelWidth, setPanelWidth] = useState(46);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const toggles: Record<string, boolean> = { gradingMatrix: true };
+  TEMPLATE.contentSections.forEach((f) => (toggles[f.id] = true));
 
-  // 1. Build initial state dynamically from JSON
-  const [formData, setFormData] = useState(() => {
-    const data: Record<string, any> = {
-      assessmentType: "Prompt Portfolio",
-      groupWorkPermitted: "No",
-      groupSize: TEMPLATE.groupWorkDefault.size,
-      groupMechanics: TEMPLATE.groupWorkDefault.mechanics,
-      submissionDates: [
-        {
-          id: Date.now(),
-          date: "2026-05-22T15:00",
-          description: "Code/Report",
-        },
-      ],
-      aiPolicy: "RED",
-      ...TEMPLATE.aiPolicyDefaults,
-    };
-    TEMPLATE.headerFields.forEach((f) => (data[f.id] = f.default));
-    TEMPLATE.contentSections.forEach((f) => (data[f.id] = f.defaultText));
-    return data;
-  });
-
-  const [sectionToggles, setSectionToggles] = useState(() => {
-    // gradingMatrix toggle added dynamically here
-    const toggles: Record<string, boolean> = { gradingMatrix: true };
-    TEMPLATE.contentSections.forEach((f) => (toggles[f.id] = true));
-    return toggles;
-  });
-
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(
-    {},
-  );
-
-  const [rubricRows, setRubricRows] = useState([
+  const rubrics = [
     {
       id: Date.now(),
       component: "Live Element (Demo)",
@@ -343,49 +268,63 @@ export default function BriefGenerator() {
       first: "Excellent understanding; highly optimised.",
       excelled: "Exceptional insight; flawless execution of edge cases.",
     },
-  ]);
+  ];
 
-  // 2. Load Draft on Mount
+  return {
+    formData: data,
+    sectionToggles: toggles,
+    selectedSkills: [] as string[],
+    rubricRows: rubrics,
+    uploadedImages: {} as Record<string, string>,
+  };
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function BriefGenerator() {
+  const [zoom, setZoom] = useState(80);
+  const [panelWidth, setPanelWidth] = useState(46);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Database / API States
+  const [briefsList, setBriefsList] = useState<any[]>([]);
+  const [currentBriefId, setCurrentBriefId] = useState<string | null>(null);
+
+  // Form States
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(
+    {},
+  );
+  const [rubricRows, setRubricRows] = useState<any[]>([]);
+
+  // 1. Load Initial Data (Mocking a GET /api/briefs/ request)
   useEffect(() => {
-    const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+    // Fetch all briefs from our mock database
+    const db = JSON.parse(localStorage.getItem(DB_STORAGE_KEY) || "[]");
+    setBriefsList(db);
+
+    // Fetch the user's active working session
+    const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
-        if (parsed.formData) {
-          if (typeof parsed.formData.submissionDate === "string") {
-            parsed.formData.submissionDates = [
-              {
-                id: Date.now(),
-                date: "",
-                description: parsed.formData.submissionDate,
-              },
-            ];
-            delete parsed.formData.submissionDate;
-          } else if (parsed.formData.submissionDates) {
-            parsed.formData.submissionDates =
-              parsed.formData.submissionDates.map((d: any) => {
-                if (d.val !== undefined)
-                  return { id: d.id, date: "", description: d.val };
-                return d;
-              });
-          }
-          if (
-            !parsed.formData.submissionDates ||
-            parsed.formData.submissionDates.length === 0
-          ) {
-            parsed.formData.submissionDates = [
-              { id: Date.now(), date: "", description: "" },
-            ];
-          }
-          setFormData((prev) => ({ ...prev, ...parsed.formData }));
-        }
-        if (parsed.sectionToggles)
-          setSectionToggles((prev) => ({ ...prev, ...parsed.sectionToggles }));
-        if (parsed.selectedSkills) setSelectedSkills(parsed.selectedSkills);
-        if (parsed.rubricRows) setRubricRows(parsed.rubricRows);
-        if (parsed.uploadedImages) setUploadedImages(parsed.uploadedImages);
+        setFormData(parsed.formData || getDefaultState().formData);
+        setSectionToggles(
+          parsed.sectionToggles || getDefaultState().sectionToggles,
+        );
+        setSelectedSkills(parsed.selectedSkills || []);
+        setRubricRows(parsed.rubricRows || getDefaultState().rubricRows);
+        setUploadedImages(parsed.uploadedImages || {});
+        setCurrentBriefId(parsed.currentBriefId || null);
       } catch (error) {
         console.error("Failed to parse local storage draft:", error);
+        loadDefault();
       }
     }
     setIsLoaded(true);
@@ -1892,71 +1831,271 @@ export default function BriefGenerator() {
                         <strong className="text-red-900">
                           strictly prohibited
                         </strong>{" "}
-                        for any part of this assessment.
-                      </p>
-                      <ul className="list-disc pl-6 space-y-1">
-                        <li>
-                          All code, logic, and writing must be entirely your own
-                          creation.
-                        </li>
-                        <li>
-                          Use of AI tools will be treated as academic
-                          misconduct.
-                        </li>
-                      </ul>
-                    </>
-                  )}
-                  {formData.aiPolicy === "AMBER" && (
-                    <>
-                      <h4 className="font-bold text-yellow-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                        🟡 AMBER: Restricted AI Usage Permitted
-                      </h4>
-                      <p className="mb-3">
-                        Generative AI tools may be used for specific, restricted
-                        purposes within this assessment.
-                      </p>
-                      <p className="mb-2">
-                        <strong>Permitted Uses:</strong>{" "}
-                        {formData.aiAmberPermitted as string}
-                      </p>
-                      <p className="mb-3">
-                        <strong>Prohibited Uses:</strong>{" "}
-                        {formData.aiAmberProhibited as string}
-                      </p>
-                      <p className="italic">
-                        <strong className="not-italic">
-                          Declaration Requirement:
-                        </strong>{" "}
-                        You must explicitly document any allowed AI use. Failure
-                        to declare permitted use is considered academic
-                        misconduct.
-                      </p>
-                    </>
-                  )}
-                  {formData.aiPolicy === "GREEN" && (
-                    <>
-                      <h4 className="font-bold text-green-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                        🟢 GREEN: Full AI Integration Encouraged
-                      </h4>
-                      <p className="mb-3">
-                        Generative AI tools are permitted and/or are a core
-                        component of this assessment.
-                      </p>
-                      <p className="mb-3">
-                        <strong>Permitted Uses:</strong>{" "}
-                        {formData.aiGreenPermitted as string}
-                      </p>
-                      <p className="italic">
-                        <strong className="not-italic">
-                          Declaration Requirement:
-                        </strong>{" "}
-                        You must include an AI_USAGE.md file detailing which
-                        tools were used and how outputs were integrated. You
-                        remain fully responsible for the accuracy of any
-                        AI-generated content.
-                      </p>
-                    </>
-                  )}
+                        <MarkdownRenderer
+                          content={formData.groupMechanics as string}
+                          images={uploadedImages}
+                        />
+                      </div>
+                    )}
+
+                    {/* Render standard configured sections */}
+                    {sectionsInGroup.map((s) => {
+                      if (!sectionToggles[s.id] || !formData[s.id]) return null;
+                      return (
+                        <div key={s.id} className="mb-4">
+                          {s.pdfLabelStyle === "inline" && (
+                            <strong>{s.label}: </strong>
+                          )}
+                          {s.pdfLabelStyle === "heading" && (
+                            <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
+                              {s.label}:
+                            </h4>
+                          )}
+                          <MarkdownRenderer
+                            content={formData[s.id] as string}
+                            images={uploadedImages}
+                          />
+                        </div>
+                      );
+                    })}
+
+                    {/* Special Injection for Skills at end of Overview */}
+                    {isOverview && hasSkills && (
+                      <div className="mb-3">
+                        <strong>Employability Skills:</strong>{" "}
+                        {selectedSkills.join(", ")}
+                      </div>
+                    )}
+
+                    {/* Special Injection for Grading Matrix at end of Evaluation block */}
+                    {hasGradingMatrix && (
+                      <table className="w-full text-left border-collapse border border-black text-[9.5pt] leading-snug mt-4">
+                        <thead className="break-inside-avoid print:break-inside-avoid">
+                          <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
+                            <th className="border-r border-black p-2 w-28">
+                              Component
+                            </th>
+                            <th className="border-r border-black p-2 w-12">
+                              Weight
+                            </th>
+                            <th className="border-r border-black p-2">
+                              Fail (&lt;40%)
+                            </th>
+                            <th className="border-r border-black p-2">
+                              Pass (40-49%)
+                            </th>
+                            <th className="border-r border-black p-2">
+                              2:2 (50-59%)
+                            </th>
+                            <th className="border-r border-black p-2">
+                              2:1 (60-69%)
+                            </th>
+                            <th className="border-r border-black p-2">
+                              1st (70-84%)
+                            </th>
+                            <th className="p-2">Excelled (85%+)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rubricRows.map((row) => (
+                            <tr
+                              key={row.id}
+                              className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
+                            >
+                              <td className="border-r border-black p-2.5 font-bold print-bg-gray-light bg-gray-50">
+                                {row.component}
+                              </td>
+                              <td className="border-r border-black p-2.5 text-center font-bold print-bg-gray-light bg-gray-50">
+                                {row.weight}
+                              </td>
+                              <td className="border-r border-black p-2.5">
+                                {row.fail}
+                              </td>
+                              <td className="border-r border-black p-2.5">
+                                {row.pass}
+                              </td>
+                              <td className="border-r border-black p-2.5">
+                                {row.twoTwo}
+                              </td>
+                              <td className="border-r border-black p-2.5">
+                                {row.twoOne}
+                              </td>
+                              <td className="border-r border-black p-2.5">
+                                {row.first}
+                              </td>
+                              <td className="p-2.5">{row.excelled}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Academic Integrity */}
+              <div className="mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
+                <p className="font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
+                  Please read all the information below carefully
+                </p>
+                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
+                  Academic Integrity
+                </h3>
+                <p className="mb-3">
+                  The University takes academic integrity very seriously. You
+                  must not commit plagiarism, collusion, or contract cheating in
+                  your submitted work. Our Policy on Plagiarism, Collusion, and
+                  Contract Cheating explains:
+                </p>
+                <ul className="list-disc pl-8 mb-3 space-y-1">
+                  <li>
+                    what is meant by the terms &apos;plagiarism&apos;,
+                    &apos;collusion&apos;, and &apos;contract cheating&apos;
+                  </li>
+                  <li>
+                    how to avoid plagiarism, collusion, and contract cheating
+                  </li>
+                  <li>using a proofreader</li>
+                  <li>
+                    what will happen if we suspect that you have breached the
+                    policy.
+                  </li>
+                </ul>
+                <p className="mb-3">
+                  It is essential that you read this policy, and you undertake
+                  (or refresh your memory of) our school&apos;s training on
+                  this. You can find the policy and related guidance here:
+                </p>
+                <a
+                  href="https://my.uea.ac.uk/departments/learningand-teaching/students/academic-cycle/regulations-and-discipline/plagiarism-awareness"
+                  className="text-blue-800 break-all underline mb-5 block font-medium"
+                >
+                  https://my.uea.ac.uk/departments/learningand-teaching/students/academic-cycle/regulations-and-discipline/plagiarism-awareness
+                </a>
+                <div className="p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
+                  In this assessment, working with others is{" "}
+                  <strong className="uppercase font-extrabold">
+                    {formData.groupWorkPermitted === "Yes"
+                      ? "PERMITTED"
+                      : "NOT PERMITTED"}
+                  </strong>
+                  .{" "}
+                  {formData.groupWorkPermitted === "No" &&
+                    "All aspects of your submission, including but not limited to: research, design, development and writing, must be your own work according to your own understanding of topics. Please pay careful attention to the definitions of contract cheating, plagiarism and collusion in the policy and ask your module organiser if you are unsure about anything."}
+                </div>
+              </div>
+
+              {/* AI Policy */}
+              <div className="mb-8">
+                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+                  AI Policy and Use
+                </h3>
+                <p className="mb-4 text-[11pt] leading-relaxed">
+                  To ensure fairness and clarity, this module uses a Traffic
+                  Light system to outline exactly how you can and cannot use
+                  generative AI tools for your assessment.
+                </p>
+
+                <div className="break-inside-avoid print:break-inside-avoid">
+                  <table className="w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
+                    <tbody>
+                      <tr>
+                        <td
+                          className={`border border-black p-3 w-1/3 ${formData.aiPolicy === "RED" ? "bg-red-200 print-bg-red" : ""}`}
+                        >
+                          🔴 RED {formData.aiPolicy === "RED" ? "✓" : ""}
+                        </td>
+                        <td
+                          className={`border border-black p-3 w-1/3 ${formData.aiPolicy === "AMBER" ? "bg-yellow-200 print-bg-yellow" : ""}`}
+                        >
+                          🟡 AMBER {formData.aiPolicy === "AMBER" ? "✓" : ""}
+                        </td>
+                        <td
+                          className={`border border-black p-3 w-1/3 ${formData.aiPolicy === "GREEN" ? "bg-green-200 print-bg-green" : ""}`}
+                        >
+                          🟢 GREEN {formData.aiPolicy === "GREEN" ? "✓" : ""}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="border-[2px] border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6">
+                    {formData.aiPolicy === "RED" && (
+                      <>
+                        <h4 className="font-bold text-red-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                          🔴 RED: No Generative AI Permitted
+                        </h4>
+                        <p className="mb-2">
+                          The use of Generative AI tools (e.g., ChatGPT, GitHub
+                          Copilot, Claude, Gemini) is{" "}
+                          <strong className="text-red-900">
+                            strictly prohibited
+                          </strong>{" "}
+                          for any part of this assessment.
+                        </p>
+                        <ul className="list-disc pl-6 space-y-1">
+                          <li>
+                            All code, logic, and writing must be entirely your
+                            own creation.
+                          </li>
+                          <li>
+                            Use of AI tools will be treated as academic
+                            misconduct.
+                          </li>
+                        </ul>
+                      </>
+                    )}
+                    {formData.aiPolicy === "AMBER" && (
+                      <>
+                        <h4 className="font-bold text-yellow-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                          🟡 AMBER: Restricted AI Usage Permitted
+                        </h4>
+                        <p className="mb-3">
+                          Generative AI tools may be used for specific,
+                          restricted purposes within this assessment.
+                        </p>
+                        <p className="mb-2">
+                          <strong>Permitted Uses:</strong>{" "}
+                          {formData.aiAmberPermitted as string}
+                        </p>
+                        <p className="mb-3">
+                          <strong>Prohibited Uses:</strong>{" "}
+                          {formData.aiAmberProhibited as string}
+                        </p>
+                        <p className="italic">
+                          <strong className="not-italic">
+                            Declaration Requirement:
+                          </strong>{" "}
+                          You must explicitly document any allowed AI use.
+                          Failure to declare permitted use is considered
+                          academic misconduct.
+                        </p>
+                      </>
+                    )}
+                    {formData.aiPolicy === "GREEN" && (
+                      <>
+                        <h4 className="font-bold text-green-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                          🟢 GREEN: Full AI Integration Encouraged
+                        </h4>
+                        <p className="mb-3">
+                          Generative AI tools are permitted and/or are a core
+                          component of this assessment.
+                        </p>
+                        <p className="mb-3">
+                          <strong>Permitted Uses:</strong>{" "}
+                          {formData.aiGreenPermitted as string}
+                        </p>
+                        <p className="italic">
+                          <strong className="not-italic">
+                            Declaration Requirement:
+                          </strong>{" "}
+                          You must include an AI_USAGE.md file detailing which
+                          tools were used and how outputs were integrated. You
+                          remain fully responsible for the accuracy of any
+                          AI-generated content.
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
