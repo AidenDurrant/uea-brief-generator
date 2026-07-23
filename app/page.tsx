@@ -423,6 +423,61 @@ export default function BriefGenerator() {
     }
   };
 
+  // 5. Submit to External API Handler
+  const handleSubmit = async () => {
+    // Construct the structured JSON payload
+    const payload = {
+      metadata: {
+        timestamp: new Date().toISOString(),
+        module: formData.module,
+        version: "1.0",
+      },
+      documentDetails: formData,
+      configuration: {
+        visibilityToggles: sectionToggles,
+        skills: selectedSkills,
+      },
+      evaluationRubric: rubricRows,
+      // Included so the external system can parse and host the images if needed
+      images: uploadedImages,
+    };
+
+    console.log("🚀 Payload ready for API Submission:");
+    console.log(JSON.stringify(payload, null, 2));
+
+    /* =================================================================
+       API INTEGRATION: Uncomment and configure this block to send data
+       =================================================================
+    try {
+      const response = await fetch('https://your-api-endpoint.com/api/briefs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${YOUR_AUTH_TOKEN}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      console.log("✅ Successfully saved to external system:", responseData);
+      alert("Brief successfully saved to the system!");
+
+    } catch (error) {
+      console.error("❌ Error submitting form:", error);
+      alert("Error saving brief to the system. Please try again.");
+    }
+    ================================================================= */
+
+    // Temporary feedback for development
+    alert(
+      "Form data compiled to JSON!\n\nOpen your browser console to view the complete payload structure. The API integration with the CMP system is currently being developed.",
+    );
+  };
+
   const handleDividerMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -651,7 +706,7 @@ export default function BriefGenerator() {
               onClick={() => window.print()}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors active:scale-95"
             >
-              <svg
+              {/*<svg
                 className="w-3.5 h-3.5"
                 fill="none"
                 stroke="currentColor"
@@ -663,8 +718,29 @@ export default function BriefGenerator() {
                   strokeWidth={2}
                   d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
                 />
-              </svg>
+              </svg>*/}
               Export PDF
+            </button>
+            <div className="w-px h-5 bg-slate-200 mx-1"></div>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors active:scale-95 shadow-sm"
+            >
+              {/*<svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>*/}
+              Save to System
             </button>
           </div>
         </header>
