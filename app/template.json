@@ -65,7 +65,8 @@
     "Overview & Learning Outcomes",
     "Task Specification",
     "Deliverables",
-    "Resources & Contact"
+    "Resources & Contact",
+    "Evaluation & Grading"
   ],
   "contentSections": [
     {
@@ -123,6 +124,13 @@
       "defaultText": "Module Organiser: m.organiser@uea.ac.uk",
       "pdfGroup": "Resources & Contact",
       "pdfLabelStyle": "heading"
+    },
+    {
+      "id": "markingScheme",
+      "label": "Marking Scheme",
+      "defaultText": "The final mark is determined by a combination of code quality, performance, and the accompanying report. See the rubric below for specific grade boundaries.",
+      "pdfGroup": "Evaluation & Grading",
+      "pdfLabelStyle": "none"
     }
   ]
 }

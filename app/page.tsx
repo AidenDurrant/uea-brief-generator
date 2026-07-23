@@ -123,31 +123,75 @@ const MarkdownRenderer = ({
   return (
     <div className="markdown-content text-[11pt] leading-relaxed text-black">
       <style>{`
+        /* Make sure floated images don't break out of their container */
+        .markdown-content::after {
+          content: "";
+          display: table;
+          clear: both;
+        }
         .markdown-content img {
           max-width: 100%;
           height: auto;
           border-radius: 6px;
-          margin: 1rem 0;
           box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
       `}</style>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        // Disable strict URL sanitization so our local attachment links don't get stripped out
         urlTransform={(value: string) => value}
         components={{
           img: ({ node, src, alt, ...props }) => {
             if (!src) return null;
 
-            // Intercept our custom attachment scheme and map it to the base64 dictionary
+            // Intercept our custom attachment scheme
             let finalSrc = src;
             if (src.startsWith("attachment:") && images) {
               const imgId = src.replace("attachment:", "");
               finalSrc = images[imgId] || src;
             }
 
-            return <img src={finalSrc} alt={alt || ""} {...props} />;
+            // Parse size and alignment from alt string
+            let finalAlt = alt || "";
+            let imgWidth: string | undefined = undefined;
+            let imgAlign = "center"; // default position
+
+            if (alt && alt.includes("|")) {
+              const parts = alt.split("|").map((p) => p.trim());
+
+              // Check if the last part is an alignment keyword
+              const lastPart = parts[parts.length - 1].toLowerCase();
+              if (["left", "right", "center"].includes(lastPart)) {
+                imgAlign = parts.pop() || "center";
+              }
+
+              // If there's still a part left (besides the actual alt text), it's the width
+              if (parts.length > 1) {
+                imgWidth = parts.pop();
+              }
+
+              finalAlt = parts.join(" | ").trim();
+            }
+
+            // Apply inline styles for sizing and alignment
+            const imgStyle: React.CSSProperties = {
+              width: imgWidth,
+            };
+
+            if (imgAlign === "left") {
+              imgStyle.float = "left";
+              imgStyle.margin = "0.5rem 1.5rem 0.5rem 0";
+            } else if (imgAlign === "right") {
+              imgStyle.float = "right";
+              imgStyle.margin = "0.5rem 0 0.5rem 1.5rem";
+            } else {
+              imgStyle.display = "block";
+              imgStyle.margin = "1rem auto";
+            }
+
+            return (
+              <img src={finalSrc} alt={finalAlt} style={imgStyle} {...props} />
+            );
           },
         }}
       >
@@ -269,7 +313,8 @@ export default function BriefGenerator() {
   });
 
   const [sectionToggles, setSectionToggles] = useState(() => {
-    const toggles: Record<string, boolean> = {};
+    // gradingMatrix toggle added dynamically here
+    const toggles: Record<string, boolean> = { gradingMatrix: true };
     TEMPLATE.contentSections.forEach((f) => (toggles[f.id] = true));
     return toggles;
   });
@@ -463,7 +508,7 @@ export default function BriefGenerator() {
     }));
   };
 
-  // Image Upload Logic (Compress to avoid localStorage limits)
+  // Image Upload Logic (Compress and insert sizing/align markdown)
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldId: string,
@@ -495,21 +540,44 @@ export default function BriefGenerator() {
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Compress JPEG to 70% quality to save huge amounts of space
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
         const imgId = "img-" + Date.now();
 
         setUploadedImages((prev) => ({ ...prev, [imgId]: dataUrl }));
         setFormData((prev) => ({
           ...prev,
+          // Insert the tag with visible size AND align parameters so users know they can edit it
           [fieldId]:
-            (prev[fieldId] || "") + `\n\n![Image](attachment:${imgId})\n`,
+            (prev[fieldId] || "") +
+            `\n\n![Image | 100% | center](attachment:${imgId})\n`,
         }));
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
-    e.target.value = ""; // Reset input so same file can be uploaded again if needed
+    e.target.value = "";
+  };
+
+  // Prevent Tab key from switching focus inside text areas, insert a Tab indent instead
+  const handleTab = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+    updateFn: (val: string) => void,
+  ) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const value = target.value;
+
+      const newValue = value.substring(0, start) + "\t" + value.substring(end);
+      updateFn(newValue);
+
+      // Reset cursor position to right after the inserted tab
+      setTimeout(() => {
+        target.selectionStart = target.selectionEnd = start + 1;
+      }, 0);
+    }
   };
 
   const currentAssessment =
@@ -936,6 +1004,9 @@ export default function BriefGenerator() {
                       className="w-full max-w-full box-border bg-white border border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
                       value={formData[field as keyof typeof formData] as string}
                       onChange={(e) => handleChange(field, e.target.value)}
+                      onKeyDown={(e) =>
+                        handleTab(e, (val) => handleChange(field, val))
+                      }
                     />
                   </div>
                 ))}
@@ -951,6 +1022,9 @@ export default function BriefGenerator() {
                   value={formData.aiGreenPermitted}
                   onChange={(e) =>
                     handleChange("aiGreenPermitted", e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleTab(e, (val) => handleChange("aiGreenPermitted", val))
                   }
                 />
               </div>
@@ -1039,74 +1113,84 @@ export default function BriefGenerator() {
                       onChange={(e) =>
                         handleChange("groupMechanics", e.target.value)
                       }
+                      onKeyDown={(e) =>
+                        handleTab(e, (val) =>
+                          handleChange("groupMechanics", val),
+                        )
+                      }
                     />
                   </div>
                 </div>
               )}
 
-              {/* Loop through JSON content sections */}
-              {TEMPLATE.contentSections.map((f) => {
-                const isVisible = sectionToggles[f.id];
-                return (
-                  <div
-                    key={f.id}
-                    className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
-                  >
+              {/* Loop through JSON content sections (excluding Eval block) */}
+              {TEMPLATE.contentSections
+                .filter((f) => f.pdfGroup !== "Evaluation & Grading")
+                .map((f) => {
+                  const isVisible = sectionToggles[f.id];
+                  return (
                     <div
-                      className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
+                      key={f.id}
+                      className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
                     >
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                          {f.label}
-                        </label>
-                        {isVisible && (
-                          <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
-                            <svg
-                              width="10"
-                              height="10"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <rect
-                                x="3"
-                                y="3"
-                                width="18"
-                                height="18"
-                                rx="2"
-                                ry="2"
-                              ></rect>
-                              <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                              <polyline points="21 15 16 10 5 21"></polyline>
-                            </svg>
-                            Add Image
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleImageUpload(e, f.id)}
-                            />
+                      <div
+                        className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                            {f.label}
                           </label>
-                        )}
+                          {isVisible && (
+                            <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect
+                                  x="3"
+                                  y="3"
+                                  width="18"
+                                  height="18"
+                                  rx="2"
+                                  ry="2"
+                                ></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                              </svg>
+                              Add Image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleImageUpload(e, f.id)}
+                              />
+                            </label>
+                          )}
+                        </div>
+                        <VisibilityToggle
+                          checked={isVisible}
+                          onChange={() => toggleSection(f.id)}
+                        />
                       </div>
-                      <VisibilityToggle
-                        checked={isVisible}
-                        onChange={() => toggleSection(f.id)}
-                      />
+                      {isVisible && (
+                        <textarea
+                          className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
+                          value={formData[f.id] as string}
+                          onChange={(e) => handleChange(f.id, e.target.value)}
+                          onKeyDown={(e) =>
+                            handleTab(e, (val) => handleChange(f.id, val))
+                          }
+                        />
+                      )}
                     </div>
-                    {isVisible && (
-                      <textarea
-                        className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
-                        value={formData[f.id] as string}
-                        onChange={(e) => handleChange(f.id, e.target.value)}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </section>
 
@@ -1118,109 +1202,210 @@ export default function BriefGenerator() {
                 "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
             }}
           >
-            <SectionHeading step={6} title="Evaluation Matrix" />
-            <div className="space-y-5 max-w-full">
-              {rubricRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="rounded-xl border border-slate-200 overflow-hidden box-border max-w-full shadow-sm"
-                >
-                  <div className="flex items-center justify-between px-5 py-3 bg-slate-100/80 border-b border-slate-200">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      Component Row
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeRubricRow(row.id)}
-                      className="text-[10px] font-extrabold uppercase tracking-wider rounded-md px-3 py-1.5 transition-all"
-                      style={{
-                        background: "#fff",
-                        border: "1px solid #e2e8f0",
-                        color: "#64748b",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#fca5a5";
-                        e.currentTarget.style.color = "#dc2626";
-                        e.currentTarget.style.background = "#fef2f2";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "#e2e8f0";
-                        e.currentTarget.style.color = "#64748b";
-                        e.currentTarget.style.background = "#fff";
-                      }}
+            <SectionHeading step={6} title="Evaluation & Grading" />
+            <div className="space-y-4 max-w-full">
+              {/* Loop through JSON content sections (specifically the Eval block) */}
+              {TEMPLATE.contentSections
+                .filter((f) => f.pdfGroup === "Evaluation & Grading")
+                .map((f) => {
+                  const isVisible = sectionToggles[f.id];
+                  return (
+                    <div
+                      key={f.id}
+                      className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
                     >
-                      ✕ Remove
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end px-5 py-4 bg-slate-50 border-b border-slate-100 max-w-full box-border">
-                    <div className="flex-1 min-w-0 w-full">
-                      <FieldLabel>Component Name</FieldLabel>
-                      <input
-                        type="text"
-                        className={INPUT}
-                        value={row.component}
-                        onChange={(e) =>
-                          updateRubricRow(row.id, "component", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="w-full sm:w-32 shrink-0">
-                      <FieldLabel>Weight</FieldLabel>
-                      <input
-                        type="text"
-                        className={`${INPUT} text-center`}
-                        value={row.weight}
-                        onChange={(e) =>
-                          updateRubricRow(row.id, "weight", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 max-w-full box-border">
-                    {GRADE_BANDS.map((g) => (
-                      <div key={g.key} className="max-w-full box-border">
-                        <div
-                          className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border mb-1.5 ${g.pill}`}
-                        >
-                          <span>{g.label}</span>
-                          <span className="opacity-70 font-medium normal-case">
-                            {g.range}
-                          </span>
+                      <div
+                        className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                            {f.label}
+                          </label>
+                          {isVisible && (
+                            <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect
+                                  x="3"
+                                  y="3"
+                                  width="18"
+                                  height="18"
+                                  rx="2"
+                                  ry="2"
+                                ></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                              </svg>
+                              Add Image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleImageUpload(e, f.id)}
+                              />
+                            </label>
+                          )}
                         </div>
-                        <textarea
-                          className="w-full max-w-full box-border bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 px-3 py-2 rounded-lg text-xs h-24 outline-none resize-none text-slate-700 transition-all"
-                          value={row[g.key as keyof typeof row] as string}
-                          onChange={(e) =>
-                            updateRubricRow(row.id, g.key, e.target.value)
-                          }
+                        <VisibilityToggle
+                          checked={isVisible}
+                          onChange={() => toggleSection(f.id)}
                         />
                       </div>
-                    ))}
-                  </div>
+                      {isVisible && (
+                        <textarea
+                          className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
+                          value={formData[f.id] as string}
+                          onChange={(e) => handleChange(f.id, e.target.value)}
+                          onKeyDown={(e) =>
+                            handleTab(e, (val) => handleChange(f.id, val))
+                          }
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+              {/* The Matrix Builder */}
+              <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border">
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-2 ${sectionToggles.gradingMatrix ? "mb-4" : ""}`}
+                >
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    Grading Matrix Table
+                  </label>
+                  <VisibilityToggle
+                    checked={sectionToggles.gradingMatrix}
+                    onChange={() => toggleSection("gradingMatrix")}
+                  />
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={addRubricRow}
-                className="w-full max-w-full box-border py-4 flex items-center justify-center gap-2 text-xs font-semibold rounded-xl"
-                style={{
-                  border: "1.5px dashed #c7d2fe",
-                  color: "#6366f1",
-                  background: "transparent",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#eef2ff";
-                  e.currentTarget.style.borderColor = "#818cf8";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderColor = "#c7d2fe";
-                }}
-              >
-                + Add Component Row
-              </button>
+
+                {sectionToggles.gradingMatrix && (
+                  <div className="space-y-5 max-w-full">
+                    {rubricRows.map((row) => (
+                      <div
+                        key={row.id}
+                        className="rounded-xl border border-slate-200 overflow-hidden box-border max-w-full shadow-sm"
+                      >
+                        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            Component Row
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeRubricRow(row.id)}
+                            className="text-[10px] font-extrabold uppercase tracking-wider rounded-md px-3 py-1.5 transition-all"
+                            style={{
+                              background: "#fff",
+                              border: "1px solid #e2e8f0",
+                              color: "#64748b",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = "#fca5a5";
+                              e.currentTarget.style.color = "#dc2626";
+                              e.currentTarget.style.background = "#fef2f2";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = "#e2e8f0";
+                              e.currentTarget.style.color = "#64748b";
+                              e.currentTarget.style.background = "#fff";
+                            }}
+                          >
+                            ✕ Remove
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end px-5 py-4 bg-slate-50 border-b border-slate-100 max-w-full box-border">
+                          <div className="flex-1 min-w-0 w-full">
+                            <FieldLabel>Component Name</FieldLabel>
+                            <input
+                              type="text"
+                              className={INPUT}
+                              value={row.component}
+                              onChange={(e) =>
+                                updateRubricRow(
+                                  row.id,
+                                  "component",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="w-full sm:w-32 shrink-0">
+                            <FieldLabel>Weight</FieldLabel>
+                            <input
+                              type="text"
+                              className={`${INPUT} text-center`}
+                              value={row.weight}
+                              onChange={(e) =>
+                                updateRubricRow(
+                                  row.id,
+                                  "weight",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 max-w-full box-border">
+                          {GRADE_BANDS.map((g) => (
+                            <div key={g.key} className="max-w-full box-border">
+                              <div
+                                className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border mb-1.5 ${g.pill}`}
+                              >
+                                <span>{g.label}</span>
+                                <span className="opacity-70 font-medium normal-case">
+                                  {g.range}
+                                </span>
+                              </div>
+                              <textarea
+                                className="w-full max-w-full box-border bg-white border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 px-3 py-2 rounded-lg text-xs h-24 outline-none resize-none text-slate-700 transition-all"
+                                value={row[g.key as keyof typeof row] as string}
+                                onChange={(e) =>
+                                  updateRubricRow(row.id, g.key, e.target.value)
+                                }
+                                onKeyDown={(e) =>
+                                  handleTab(e, (val) =>
+                                    updateRubricRow(row.id, g.key, val),
+                                  )
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addRubricRow}
+                      className="w-full max-w-full box-border py-4 flex items-center justify-center gap-2 text-xs font-semibold rounded-xl"
+                      style={{
+                        border: "1.5px dashed #c7d2fe",
+                        color: "#6366f1",
+                        background: "transparent",
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#eef2ff";
+                        e.currentTarget.style.borderColor = "#818cf8";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.borderColor = "#c7d2fe";
+                      }}
+                    >
+                      + Add Component Row
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         </div>
@@ -1389,6 +1574,7 @@ export default function BriefGenerator() {
               );
               const isOverview = groupTitle === "Overview & Learning Outcomes";
               const isTaskSpec = groupTitle === "Task Specification";
+              const isEvalGroup = groupTitle === "Evaluation & Grading";
 
               // Check if group is completely empty
               const hasVisibleDynamic = sectionsInGroup.some(
@@ -1397,8 +1583,17 @@ export default function BriefGenerator() {
               const hasSkills = isOverview && selectedSkills.length > 0;
               const hasGroupWork =
                 isTaskSpec && formData.groupWorkPermitted === "Yes";
+              const hasGradingMatrix =
+                isEvalGroup &&
+                sectionToggles.gradingMatrix &&
+                rubricRows.length > 0;
 
-              if (!hasVisibleDynamic && !hasSkills && !hasGroupWork)
+              if (
+                !hasVisibleDynamic &&
+                !hasSkills &&
+                !hasGroupWork &&
+                !hasGradingMatrix
+              )
                 return null;
 
               return (
@@ -1450,6 +1645,69 @@ export default function BriefGenerator() {
                       <strong>Employability Skills:</strong>{" "}
                       {selectedSkills.join(", ")}
                     </div>
+                  )}
+
+                  {/* Special Injection for Grading Matrix at end of Evaluation block */}
+                  {hasGradingMatrix && (
+                    <table className="w-full text-left border-collapse border border-black text-[9.5pt] leading-snug mt-4">
+                      <thead className="break-inside-avoid print:break-inside-avoid">
+                        <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
+                          <th className="border-r border-black p-2 w-28">
+                            Component
+                          </th>
+                          <th className="border-r border-black p-2 w-12">
+                            Weight
+                          </th>
+                          <th className="border-r border-black p-2">
+                            Fail (&lt;40%)
+                          </th>
+                          <th className="border-r border-black p-2">
+                            Pass (40-49%)
+                          </th>
+                          <th className="border-r border-black p-2">
+                            2:2 (50-59%)
+                          </th>
+                          <th className="border-r border-black p-2">
+                            2:1 (60-69%)
+                          </th>
+                          <th className="border-r border-black p-2">
+                            1st (70-84%)
+                          </th>
+                          <th className="p-2">Excelled (85%+)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rubricRows.map((row) => (
+                          <tr
+                            key={row.id}
+                            className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
+                          >
+                            <td className="border-r border-black p-2.5 font-bold print-bg-gray-light bg-gray-50">
+                              {row.component}
+                            </td>
+                            <td className="border-r border-black p-2.5 text-center font-bold print-bg-gray-light bg-gray-50">
+                              {row.weight}
+                            </td>
+                            <td className="border-r border-black p-2.5">
+                              {row.fail}
+                            </td>
+                            <td className="border-r border-black p-2.5">
+                              {row.pass}
+                            </td>
+                            <td className="border-r border-black p-2.5">
+                              {row.twoTwo}
+                            </td>
+                            <td className="border-r border-black p-2.5">
+                              {row.twoOne}
+                            </td>
+                            <td className="border-r border-black p-2.5">
+                              {row.first}
+                            </td>
+                            <td className="p-2.5">{row.excelled}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                 </div>
               );
@@ -1619,66 +1877,6 @@ export default function BriefGenerator() {
                   )}
                 </div>
               </div>
-            </div>
-
-            {/* Grading matrix */}
-            <div className="mb-8">
-              <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                Evaluation &amp; Grading Matrix
-              </h3>
-              <p className="mb-4 text-[11pt] leading-relaxed">
-                The final mark is based on the following criteria across the
-                standard degree classification boundaries:
-              </p>
-              <table className="w-full text-left border-collapse border border-black text-[9.5pt] leading-snug">
-                <thead className="break-inside-avoid print:break-inside-avoid">
-                  <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
-                    <th className="border-r border-black p-2 w-28">
-                      Component
-                    </th>
-                    <th className="border-r border-black p-2 w-12">Weight</th>
-                    <th className="border-r border-black p-2">
-                      Fail (&lt;40%)
-                    </th>
-                    <th className="border-r border-black p-2">Pass (40-49%)</th>
-                    <th className="border-r border-black p-2">2:2 (50-59%)</th>
-                    <th className="border-r border-black p-2">2:1 (60-69%)</th>
-                    <th className="border-r border-black p-2">1st (70-84%)</th>
-                    <th className="p-2">Excelled (85%+)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rubricRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
-                    >
-                      <td className="border-r border-black p-2.5 font-bold print-bg-gray-light bg-gray-50">
-                        {row.component}
-                      </td>
-                      <td className="border-r border-black p-2.5 text-center font-bold print-bg-gray-light bg-gray-50">
-                        {row.weight}
-                      </td>
-                      <td className="border-r border-black p-2.5">
-                        {row.fail}
-                      </td>
-                      <td className="border-r border-black p-2.5">
-                        {row.pass}
-                      </td>
-                      <td className="border-r border-black p-2.5">
-                        {row.twoTwo}
-                      </td>
-                      <td className="border-r border-black p-2.5">
-                        {row.twoOne}
-                      </td>
-                      <td className="border-r border-black p-2.5">
-                        {row.first}
-                      </td>
-                      <td className="p-2.5">{row.excelled}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
