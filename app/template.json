@@ -1,0 +1,128 @@
+{
+  "documentTitles": {
+    "institution": "University of East Anglia"
+  },
+  "headerFields": [
+    {
+      "id": "school",
+      "label": "School",
+      "default": "School of Computing Science",
+      "type": "text"
+    },
+    {
+      "id": "programme",
+      "label": "Programme / Year",
+      "default": "BSc Computing Science 2026-2027",
+      "type": "text"
+    },
+    {
+      "id": "module",
+      "label": "Module",
+      "default": "CMP-1001 Introduction to Programming",
+      "type": "text"
+    },
+    {
+      "id": "weighting",
+      "label": "Weighting",
+      "default": "40%",
+      "type": "text"
+    },
+    {
+      "id": "setBy",
+      "label": "Set / Checked By",
+      "default": "Module Organiser Name / Second Marker Name",
+      "type": "text"
+    },
+    {
+      "id": "releaseDate",
+      "label": "Release Date",
+      "default": "2026-10-01",
+      "type": "date"
+    },
+    {
+      "id": "submissionLocation",
+      "label": "Submission Location",
+      "default": "Blackboard / GitHub Classroom",
+      "type": "text"
+    },
+    {
+      "id": "returnOfFeedback",
+      "label": "Return of Feedback",
+      "default": "Within 20 working days",
+      "type": "text"
+    }
+  ],
+  "aiPolicyDefaults": {
+    "aiAmberPermitted": "You may use AI to explain error messages or format references.",
+    "aiAmberProhibited": "You MUST NOT use AI to generate application code or write technical reports.",
+    "aiGreenPermitted": "You may use AI tools to assist with coding, debugging, drafting, and architecture design."
+  },
+  "groupWorkDefault": {
+    "size": "3",
+    "mechanics": "**Formation:** Register via the link by Friday of Week 7.\n**No Group?:** If you cannot find a group, email the module organiser by X date to be assigned."
+  },
+  "pdfGroupOrder": [
+    "Overview & Learning Outcomes",
+    "Task Specification",
+    "Deliverables",
+    "Resources & Contact"
+  ],
+  "contentSections": [
+    {
+      "id": "contextScenario",
+      "label": "Context & Scenario",
+      "defaultText": "Provide a 2-3 sentence real-world framing or context for the assessment.",
+      "pdfGroup": "Overview & Learning Outcomes",
+      "pdfLabelStyle": "inline"
+    },
+    {
+      "id": "learningOutcomes",
+      "label": "Learning Outcomes Assessed",
+      "defaultText": "* Demonstrate a systematic understanding of key aspects of artificial intelligence.\n* Deploy accurately established techniques of analysis and enquiry within computer science.",
+      "pdfGroup": "Overview & Learning Outcomes",
+      "pdfLabelStyle": "inline"
+    },
+    {
+      "id": "coreObjectives",
+      "label": "Task Spec / Core Objectives",
+      "defaultText": "### Task 1: Algorithm Implementation\nOutline specific task requirements or exam topics. e.g., Implement $O(N \\log N)$ sort.",
+      "pdfGroup": "Task Specification",
+      "pdfLabelStyle": "inline"
+    },
+    {
+      "id": "architectureConstraints",
+      "label": "Architecture & Technical Constraints",
+      "defaultText": "**Required Components:** Python 3.10+, PyTorch\n**Allowed Materials:** Open book, one A4 cheat sheet.",
+      "pdfGroup": "Task Specification",
+      "pdfLabelStyle": "inline"
+    },
+    {
+      "id": "deliverables",
+      "label": "Deliverables",
+      "defaultText": "**Source Code/Files:** A single `.zip` file containing all code and a `README.md`.\n**Documentation/Report:** Concisely document the architecture and methods.",
+      "pdfGroup": "Deliverables",
+      "pdfLabelStyle": "none"
+    },
+    {
+      "id": "submissionInstructions",
+      "label": "Submission Instructions",
+      "defaultText": "Submit via the Blackboard assignment link before the deadline.",
+      "pdfGroup": "Deliverables",
+      "pdfLabelStyle": "heading"
+    },
+    {
+      "id": "resourcesHints",
+      "label": "Resources & Hints",
+      "defaultText": "**Provided Data:** Historical datasets available on Blackboard.\n**Documentation:** Review the official API Guidelines.",
+      "pdfGroup": "Resources & Contact",
+      "pdfLabelStyle": "none"
+    },
+    {
+      "id": "contactInfo",
+      "label": "Contact Information",
+      "defaultText": "Module Organiser: m.organiser@uea.ac.uk",
+      "pdfGroup": "Resources & Contact",
+      "pdfLabelStyle": "heading"
+    }
+  ]
+}

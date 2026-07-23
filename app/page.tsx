@@ -5,6 +5,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import SKILLS_LIST from "./skills.json";
 import ASSESSMENT_METHODS from "./assessments.json";
+import TEMPLATE from "./template.json";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LOCAL_STORAGE_KEY = "uea_brief_draft_v1";
@@ -35,6 +36,51 @@ const AI_CARD_STATES: Record<
 
 const INPUT =
   "w-full max-w-full box-border bg-slate-50 border border-slate-200 text-slate-900 rounded-lg px-3.5 py-2.5 text-sm outline-none transition-all hover:bg-white hover:border-slate-300 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400";
+
+const GRADE_BANDS = [
+  {
+    key: "fail",
+    label: "Fail",
+    range: "<40%",
+    pill: "bg-red-100 text-red-700 border-red-200",
+  },
+  {
+    key: "pass",
+    label: "Pass",
+    range: "40–49%",
+    pill: "bg-orange-100 text-orange-700 border-orange-200",
+  },
+  {
+    key: "twoTwo",
+    label: "2:2",
+    range: "50–59%",
+    pill: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  },
+  {
+    key: "twoOne",
+    label: "2:1",
+    range: "60–69%",
+    pill: "bg-sky-100 text-sky-700 border-sky-200",
+  },
+  {
+    key: "first",
+    label: "1st",
+    range: "70–84%",
+    pill: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  },
+  {
+    key: "excelled",
+    label: "Excelled",
+    range: "85%+",
+    pill: "bg-violet-100 text-violet-700 border-violet-200",
+  },
+];
+
+const AI_OPTIONS = [
+  { value: "RED", emoji: "🔴", label: "RED", desc: "No AI Permitted" },
+  { value: "AMBER", emoji: "🟡", label: "AMBER", desc: "Restricted Use" },
+  { value: "GREEN", emoji: "🟢", label: "GREEN", desc: "Full Integration" },
+];
 
 // ─── Helper Formatting Functions ──────────────────────────────────────────────
 
@@ -156,112 +202,40 @@ function VisibilityToggle({
   );
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-const AI_OPTIONS = [
-  { value: "RED", emoji: "🔴", label: "RED", desc: "No AI Permitted" },
-  { value: "AMBER", emoji: "🟡", label: "AMBER", desc: "Restricted Use" },
-  { value: "GREEN", emoji: "🟢", label: "GREEN", desc: "Full Integration" },
-];
-
-const GRADE_BANDS = [
-  {
-    key: "fail",
-    label: "Fail",
-    range: "<40%",
-    pill: "bg-red-100 text-red-700 border-red-200",
-  },
-  {
-    key: "pass",
-    label: "Pass",
-    range: "40–49%",
-    pill: "bg-orange-100 text-orange-700 border-orange-200",
-  },
-  {
-    key: "twoTwo",
-    label: "2:2",
-    range: "50–59%",
-    pill: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  },
-  {
-    key: "twoOne",
-    label: "2:1",
-    range: "60–69%",
-    pill: "bg-sky-100 text-sky-700 border-sky-200",
-  },
-  {
-    key: "first",
-    label: "1st",
-    range: "70–84%",
-    pill: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  },
-  {
-    key: "excelled",
-    label: "Excelled",
-    range: "85%+",
-    pill: "bg-violet-100 text-violet-700 border-violet-200",
-  },
-];
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function BriefGenerator() {
   const [zoom, setZoom] = useState(80);
   const [panelWidth, setPanelWidth] = useState(46);
-  const [isLoaded, setIsLoaded] = useState(false); // Prevents hydration mismatch
+  const [isLoaded, setIsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Set Initial State Defaults
-  const [formData, setFormData] = useState({
-    school: "School of Computing Science",
-    programme: "BSc Computing Science 2026-2027",
-    module: "CMP-1001 Introduction to Programming",
-    assessmentType: "Prompt Portfolio",
-    weighting: "40%",
-    setBy: "Module Organiser Name / Second Marker Name",
-    releaseDate: "2026-10-01",
-    submissionDates: [
-      { id: Date.now(), date: "2026-05-22T15:00", description: "Code/Report" },
-    ],
-    submissionLocation: "Blackboard / GitHub Classroom",
-    returnOfFeedback: "Within 20 working days",
-    groupWorkPermitted: "No",
-    groupSize: "3", // Default specific size field
-    contextScenario:
-      "Provide a 2-3 sentence real-world framing or context for the assessment.",
-    learningOutcomes:
-      "* Demonstrate a systematic understanding of key aspects of artificial intelligence.\n* Deploy accurately established techniques of analysis and enquiry within computer science.",
-    groupMechanics:
-      "**Formation:** Register via the link by Friday of Week 7.\n**No Group?:** If you cannot find a group, email the module organiser by X date to be assigned.",
-    coreObjectives:
-      "### Task 1: Algorithm Implementation\nOutline specific task requirements or exam topics. e.g., Implement $O(N \\log N)$ sort.",
-    architectureConstraints:
-      "**Required Components:** Python 3.10+, PyTorch\n**Allowed Materials:** Open book, one A4 cheat sheet.",
-    deliverables:
-      "**Source Code/Files:** A single `.zip` file containing all code and a `README.md`.\n**Documentation/Report:** Concisely document the architecture and methods.",
-    submissionInstructions:
-      "Submit via the Blackboard assignment link before the deadline.",
-    resourcesHints:
-      "**Provided Data:** Historical datasets available on Blackboard.\n**Documentation:** Review the official API Guidelines.",
-    contactInfo: "Module Organiser: m.organiser@uea.ac.uk",
-    aiPolicy: "RED",
-    aiAmberPermitted:
-      "You may use AI to explain error messages or format references.",
-    aiAmberProhibited:
-      "You MUST NOT use AI to generate application code or write technical reports.",
-    aiGreenPermitted:
-      "You may use AI tools to assist with coding, debugging, drafting, and architecture design.",
+  // 1. Build initial state dynamically from JSON
+  const [formData, setFormData] = useState(() => {
+    const data: Record<string, any> = {
+      assessmentType: "Prompt Portfolio",
+      groupWorkPermitted: "No",
+      groupSize: TEMPLATE.groupWorkDefault.size,
+      groupMechanics: TEMPLATE.groupWorkDefault.mechanics,
+      submissionDates: [
+        {
+          id: Date.now(),
+          date: "2026-05-22T15:00",
+          description: "Code/Report",
+        },
+      ],
+      aiPolicy: "RED",
+      ...TEMPLATE.aiPolicyDefaults,
+    };
+    TEMPLATE.headerFields.forEach((f) => (data[f.id] = f.default));
+    TEMPLATE.contentSections.forEach((f) => (data[f.id] = f.defaultText));
+    return data;
   });
 
-  const [sectionToggles, setSectionToggles] = useState({
-    contextScenario: true,
-    learningOutcomes: true,
-    coreObjectives: true,
-    architectureConstraints: true,
-    deliverables: true,
-    submissionInstructions: true,
-    resourcesHints: true,
-    contactInfo: true,
+  const [sectionToggles, setSectionToggles] = useState(() => {
+    const toggles: Record<string, boolean> = {};
+    TEMPLATE.contentSections.forEach((f) => (toggles[f.id] = true));
+    return toggles;
   });
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -287,7 +261,6 @@ export default function BriefGenerator() {
       try {
         const parsed = JSON.parse(savedDraft);
         if (parsed.formData) {
-          // Migration: Convert old submission date strings into the new calendar format
           if (typeof parsed.formData.submissionDate === "string") {
             parsed.formData.submissionDates = [
               {
@@ -300,9 +273,8 @@ export default function BriefGenerator() {
           } else if (parsed.formData.submissionDates) {
             parsed.formData.submissionDates =
               parsed.formData.submissionDates.map((d: any) => {
-                if (d.val !== undefined) {
+                if (d.val !== undefined)
                   return { id: d.id, date: "", description: d.val };
-                }
                 return d;
               });
           }
@@ -314,9 +286,10 @@ export default function BriefGenerator() {
               { id: Date.now(), date: "", description: "" },
             ];
           }
-          setFormData(parsed.formData);
+          setFormData((prev) => ({ ...prev, ...parsed.formData }));
         }
-        if (parsed.sectionToggles) setSectionToggles(parsed.sectionToggles);
+        if (parsed.sectionToggles)
+          setSectionToggles((prev) => ({ ...prev, ...parsed.sectionToggles }));
         if (parsed.selectedSkills) setSelectedSkills(parsed.selectedSkills);
         if (parsed.rubricRows) setRubricRows(parsed.rubricRows);
       } catch (error) {
@@ -326,9 +299,9 @@ export default function BriefGenerator() {
     setIsLoaded(true);
   }, []);
 
-  // 3. Auto-save Draft on Change
+  // 3. Auto-save Draft
   useEffect(() => {
-    if (!isLoaded) return; // Don't save before initial load
+    if (!isLoaded) return;
     const draft = { formData, sectionToggles, selectedSkills, rubricRows };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
   }, [formData, sectionToggles, selectedSkills, rubricRows, isLoaded]);
@@ -341,7 +314,7 @@ export default function BriefGenerator() {
       )
     ) {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
-      window.location.reload(); // Fast way to reset states to default
+      window.location.reload();
     }
   };
 
@@ -370,7 +343,7 @@ export default function BriefGenerator() {
     [],
   );
 
-  const toggleSection = (key: keyof typeof sectionToggles) => {
+  const toggleSection = (key: string) => {
     setSectionToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -406,7 +379,6 @@ export default function BriefGenerator() {
   const handleChange = (field: string, value: string) =>
     setFormData((p) => ({ ...p, [field]: value }));
 
-  // Multiple Submission Dates Handlers
   const addSubmissionDate = () => {
     setFormData((p) => ({
       ...p,
@@ -437,32 +409,11 @@ export default function BriefGenerator() {
     }));
   };
 
-  const textAreas = [
-    { label: "Context & Scenario", key: "contextScenario" },
-    { label: "Learning Outcomes Assessed", key: "learningOutcomes" },
-    ...(formData.groupWorkPermitted === "Yes"
-      ? [{ label: "Group Mechanics", key: "groupMechanics" }]
-      : []),
-    { label: "Task Spec / Core Objectives", key: "coreObjectives" },
-    {
-      label: "Architecture & Technical Constraints",
-      key: "architectureConstraints",
-    },
-    { label: "Deliverables", key: "deliverables" },
-    { label: "Submission Instructions", key: "submissionInstructions" },
-    { label: "Resources & Hints", key: "resourcesHints" },
-    { label: "Contact Information", key: "contactInfo" },
-  ];
-
-  // Helper variable to fetch current assessment object
   const currentAssessment =
     ASSESSMENT_METHODS.find((a) => a.method === formData.assessmentType) ||
     ASSESSMENT_METHODS[0];
 
-  // Prevent rendering until local storage is loaded to avoid hydration mismatch flashes
   if (!isLoaded) return null;
-
-  // ─── JSX ────────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -476,7 +427,6 @@ export default function BriefGenerator() {
         className="h-full flex flex-col print:hidden shrink-0 overflow-hidden"
         style={{ width: `${panelWidth}%`, minWidth: 300 }}
       >
-        {/* ── Header ── */}
         <header
           className="shrink-0 flex items-center justify-between"
           style={{
@@ -542,7 +492,6 @@ export default function BriefGenerator() {
           </div>
         </header>
 
-        {/* ── Scrollable form ── */}
         <div
           className="flex-1 overflow-y-auto space-y-6"
           style={{
@@ -563,32 +512,24 @@ export default function BriefGenerator() {
           >
             <SectionHeading step={1} title="Header Details" />
             <div className="flex flex-col space-y-5">
-              {(
-                [
-                  ["school", "School"],
-                  ["programme", "Programme / Year"],
-                  ["module", "Module"],
-                  ["weighting", "Weighting"],
-                  ["setBy", "Set / Checked By"],
-                  ["releaseDate", "Release Date"],
-                ] as [string, string][]
-              ).map(([key, label]) => (
-                <div key={key}>
-                  <FieldLabel>{label}</FieldLabel>
+              {/* Dynamic Headers from JSON */}
+              {TEMPLATE.headerFields.map((field) => (
+                <div key={field.id}>
+                  <FieldLabel>{field.label}</FieldLabel>
                   <input
-                    type={key === "releaseDate" ? "date" : "text"}
+                    type={field.type || "text"}
                     className={INPUT}
-                    value={formData[key as keyof typeof formData] as string}
-                    onChange={(e) => handleChange(key, e.target.value)}
+                    value={formData[field.id] as string}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
                   />
                 </div>
               ))}
 
               {/* Dynamic Submission Dates Field with Flex Wrap */}
-              <div>
+              <div className="pt-2 border-t border-slate-100">
                 <FieldLabel>Submission / Exam Date(s)</FieldLabel>
                 <div className="space-y-3">
-                  {formData.submissionDates.map((item) => (
+                  {formData.submissionDates.map((item: any) => (
                     <div key={item.id} className="flex flex-wrap gap-2">
                       <input
                         type="datetime-local"
@@ -634,23 +575,6 @@ export default function BriefGenerator() {
                   </button>
                 </div>
               </div>
-
-              {(
-                [
-                  ["submissionLocation", "Submission Location"],
-                  ["returnOfFeedback", "Return of Feedback"],
-                ] as [string, string][]
-              ).map(([key, label]) => (
-                <div key={key}>
-                  <FieldLabel>{label}</FieldLabel>
-                  <input
-                    type="text"
-                    className={INPUT}
-                    value={formData[key as keyof typeof formData] as string}
-                    onChange={(e) => handleChange(key, e.target.value)}
-                  />
-                </div>
-              ))}
             </div>
           </section>
 
@@ -663,7 +587,6 @@ export default function BriefGenerator() {
             }}
           >
             <SectionHeading step={2} title="Assessment Method" />
-
             <div>
               <FieldLabel>Type of Assessment</FieldLabel>
               <select
@@ -678,7 +601,6 @@ export default function BriefGenerator() {
                 ))}
               </select>
 
-              {/* Dynamic details purely for the Editor, not rendered on PDF */}
               <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200">
                   <span
@@ -712,20 +634,16 @@ export default function BriefGenerator() {
             }}
           >
             <SectionHeading step={3} title="Policies & Skills" />
-
-            {/* ─ Group Work ─ */}
             <div className="mb-0">
               <FieldLabel>Group Work</FieldLabel>
               <div
                 className="flex p-1 gap-1 rounded-xl"
                 style={{ background: "#f1f5f9" }}
               >
-                {(
-                  [
-                    ["No", "Individual Assignment"],
-                    ["Yes", "Group Work Permitted"],
-                  ] as [string, string][]
-                ).map(([val, display]) => {
+                {[
+                  ["No", "Individual Assignment"],
+                  ["Yes", "Group Work Permitted"],
+                ].map(([val, display]) => {
                   const active = formData.groupWorkPermitted === val;
                   return (
                     <button
@@ -771,7 +689,6 @@ export default function BriefGenerator() {
               </div>
             </div>
 
-            {/* ─ Employability Skills ─ */}
             <div
               style={{
                 borderTop: "1px solid #f1f5f9",
@@ -851,7 +768,6 @@ export default function BriefGenerator() {
             }}
           >
             <SectionHeading step={4} title="Generative AI Policy" />
-
             <div className="grid grid-cols-3 gap-4 mb-7">
               {AI_OPTIONS.map((opt) => {
                 const on = formData.aiPolicy === opt.value;
@@ -938,7 +854,7 @@ export default function BriefGenerator() {
             )}
           </section>
 
-          {/* 5 — Content Specifications (With Visible Toggles & Dynamic Group Size) */}
+          {/* 5 — Content Specifications (Dynamic from JSON) */}
           <section
             className="bg-white rounded-xl p-8 overflow-hidden box-border"
             style={{
@@ -948,70 +864,74 @@ export default function BriefGenerator() {
           >
             <SectionHeading step={5} title="Content Specifications" />
             <div className="space-y-4 max-w-full">
-              {textAreas.map((f) => {
-                const isToggleable = f.key !== "groupMechanics";
-                const isVisible = isToggleable
-                  ? sectionToggles[f.key as keyof typeof sectionToggles]
-                  : true;
+              {/* Special Injection for Group Mechanics Editor if Permitted */}
+              {formData.groupWorkPermitted === "Yes" && (
+                <div className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                      Group Mechanics
+                    </label>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Target Group Size:
+                      </label>
+                      <select
+                        className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer border-indigo-200`}
+                        value={formData.groupSize}
+                        onChange={(e) =>
+                          handleChange("groupSize", e.target.value)
+                        }
+                      >
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="2-3">2-3</option>
+                        <option value="3-4">3-4</option>
+                        <option value="4-5">4-5</option>
+                        <option value="5-6">5-6</option>
+                        <option value="Variable">Variable</option>
+                      </select>
+                    </div>
+                    <textarea
+                      className={`${INPUT} font-mono h-28 leading-relaxed resize-y border-indigo-200 focus:border-indigo-500`}
+                      value={formData.groupMechanics as string}
+                      onChange={(e) =>
+                        handleChange("groupMechanics", e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
+              {/* Loop through JSON content sections */}
+              {TEMPLATE.contentSections.map((f) => {
+                const isVisible = sectionToggles[f.id];
                 return (
                   <div
-                    key={f.key}
+                    key={f.id}
                     className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
                   >
                     <div
-                      className={`flex flex-wrap items-center justify-between gap-2 ${
-                        isVisible ? "mb-4" : ""
-                      }`}
+                      className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
                     >
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                         {f.label}
                       </label>
-                      {isToggleable && (
-                        <VisibilityToggle
-                          checked={isVisible}
-                          onChange={() =>
-                            toggleSection(f.key as keyof typeof sectionToggles)
-                          }
-                        />
-                      )}
+                      <VisibilityToggle
+                        checked={isVisible}
+                        onChange={() => toggleSection(f.id)}
+                      />
                     </div>
                     {isVisible && (
-                      <div className="space-y-4">
-                        {/* Dynamic group size input injected above the mechanics text area */}
-                        {f.key === "groupMechanics" && (
-                          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                              Target Group Size:
-                            </label>
-                            <select
-                              className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer`}
-                              value={formData.groupSize}
-                              onChange={(e) =>
-                                handleChange("groupSize", e.target.value)
-                              }
-                            >
-                              <option value="2">2</option>
-                              <option value="3">3</option>
-                              <option value="4">4</option>
-                              <option value="5">5</option>
-                              <option value="6">6</option>
-                              <option value="2-3">2-3</option>
-                              <option value="3-4">3-4</option>
-                              <option value="4-5">4-5</option>
-                              <option value="5-6">5-6</option>
-                              <option value="Variable">Variable</option>
-                            </select>
-                          </div>
-                        )}
-                        <textarea
-                          className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
-                          value={
-                            formData[f.key as keyof typeof formData] as string
-                          }
-                          onChange={(e) => handleChange(f.key, e.target.value)}
-                        />
-                      </div>
+                      <textarea
+                        className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
+                        value={formData[f.id] as string}
+                        onChange={(e) => handleChange(f.id, e.target.value)}
+                      />
                     )}
                   </div>
                 );
@@ -1029,12 +949,11 @@ export default function BriefGenerator() {
           >
             <SectionHeading step={6} title="Evaluation Matrix" />
             <div className="space-y-5 max-w-full">
-              {rubricRows.map((row, index) => (
+              {rubricRows.map((row) => (
                 <div
                   key={row.id}
                   className="rounded-xl border border-slate-200 overflow-hidden box-border max-w-full shadow-sm"
                 >
-                  {/* Action Bar for the Row */}
                   <div className="flex items-center justify-between px-5 py-3 bg-slate-100/80 border-b border-slate-200">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                       Component Row
@@ -1224,14 +1143,13 @@ export default function BriefGenerator() {
         <div className="flex-1 overflow-auto bg-slate-700 p-10 flex justify-center items-start print:p-0 print:block print:h-auto print:overflow-visible print:bg-white print:m-0">
           <div
             className="pdf-page box-border mx-auto bg-white text-black font-serif shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
-            style={{
-              zoom: zoom / 100,
-            }}
+            style={{ zoom: zoom / 100 }}
           >
             {/* PDF Header */}
             <div className="mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
               <h1 className="text-3xl font-bold uppercase tracking-widest">
-                University of East Anglia
+                {TEMPLATE.documentTitles?.institution ||
+                  "University of East Anglia"}
               </h1>
               <h2 className="text-[1.2rem] font-semibold mt-2">
                 {formData.school}
@@ -1241,151 +1159,126 @@ export default function BriefGenerator() {
               </h3>
             </div>
 
-            {/* Details table */}
+            {/* Details table (Dynamically mapped from JSON) */}
             <table className="w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
               <tbody>
-                {(
-                  [
-                    ["Module", formData.module],
-                    ["Assessment Type", formData.assessmentType],
-                    ["Weighting", formData.weighting],
-                    ["Set By / Checked By", formData.setBy],
-                    ["Release Date", formatDateOnly(formData.releaseDate)],
-                    [
-                      "Submission / Exam Date(s)",
-                      formData.submissionDates.map((d) =>
-                        formatDateTime(d.date, d.description),
-                      ),
-                    ],
-                    ["Submission Location", formData.submissionLocation],
-                    ["Return of Feedback", formData.returnOfFeedback],
-                  ] as [string, string | string[]][]
-                ).map(([label, val], i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-black print:break-inside-avoid"
-                  >
-                    <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                      {label}
-                    </th>
-                    <td className="py-2.5 px-4">
-                      {Array.isArray(val)
-                        ? val.map((v, idx) => (
-                            <div key={idx} className={idx > 0 ? "mt-1" : ""}>
-                              {v}
-                            </div>
-                          ))
-                        : val}
-                    </td>
-                  </tr>
-                ))}
+                {TEMPLATE.headerFields
+                  .filter((f) => f.id !== "school" && f.id !== "programme")
+                  .map((field, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-black print:break-inside-avoid"
+                    >
+                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                        {field.label}
+                      </th>
+                      <td className="py-2.5 px-4">
+                        {field.type === "date"
+                          ? formatDateOnly(formData[field.id] as string)
+                          : (formData[field.id] as string)}
+                      </td>
+                    </tr>
+                  ))}
+                <tr className="border-b border-black print:break-inside-avoid">
+                  <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                    Submission / Exam Date(s)
+                  </th>
+                  <td className="py-2.5 px-4">
+                    {formData.submissionDates.map((d: any, idx: number) => (
+                      <div key={idx} className={idx > 0 ? "mt-1" : ""}>
+                        {formatDateTime(d.date, d.description)}
+                      </div>
+                    ))}
+                  </td>
+                </tr>
+                <tr className="border-b border-black print:break-inside-avoid">
+                  <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                    Submission Location
+                  </th>
+                  <td className="py-2.5 px-4">
+                    {formData.submissionLocation as string}
+                  </td>
+                </tr>
+                <tr className="border-b border-black print:break-inside-avoid">
+                  <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                    Return of Feedback
+                  </th>
+                  <td className="py-2.5 px-4">
+                    {formData.returnOfFeedback as string}
+                  </td>
+                </tr>
               </tbody>
             </table>
 
-            {/* Overview */}
-            {(sectionToggles.contextScenario ||
-              sectionToggles.learningOutcomes ||
-              selectedSkills.length > 0) && (
-              <div className="mb-8 break-inside-avoid print:break-inside-avoid">
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                  Overview & Learning Outcomes
-                </h3>
-                {sectionToggles.contextScenario && (
-                  <div className="mb-3">
-                    <strong>Context &amp; Scenario:</strong>{" "}
-                    <MarkdownRenderer content={formData.contextScenario} />
-                  </div>
-                )}
-                {sectionToggles.learningOutcomes && (
-                  <div className="mb-3">
-                    <strong>Learning Outcomes Assessed:</strong>{" "}
-                    <MarkdownRenderer content={formData.learningOutcomes} />
-                  </div>
-                )}
-                {selectedSkills.length > 0 && (
-                  <div className="mb-3">
-                    <strong>Employability Skills:</strong>{" "}
-                    {selectedSkills.join(", ")}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Dynamic Content Sections Mapping */}
+            {TEMPLATE.pdfGroupOrder.map((groupTitle) => {
+              // Get sections for this group from JSON
+              const sectionsInGroup = TEMPLATE.contentSections.filter(
+                (s) => s.pdfGroup === groupTitle,
+              );
+              const isOverview = groupTitle === "Overview & Learning Outcomes";
+              const isTaskSpec = groupTitle === "Task Specification";
 
-            {/* Task Specification */}
-            {(formData.groupWorkPermitted === "Yes" ||
-              sectionToggles.coreObjectives ||
-              sectionToggles.architectureConstraints) && (
-              <div className="mb-8 break-inside-avoid print:break-inside-avoid">
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                  Task Specification
-                </h3>
-                {formData.groupWorkPermitted === "Yes" && (
-                  <div className="mb-4">
-                    <strong>
-                      Group Mechanics (Target Size: {formData.groupSize}):
-                    </strong>{" "}
-                    <MarkdownRenderer content={formData.groupMechanics} />
-                  </div>
-                )}
-                {sectionToggles.coreObjectives && (
-                  <div className="mb-4">
-                    <strong>Core Objectives:</strong>{" "}
-                    <MarkdownRenderer content={formData.coreObjectives} />
-                  </div>
-                )}
-                {sectionToggles.architectureConstraints && (
-                  <div className="mb-4">
-                    <strong>Architecture &amp; Technical Constraints:</strong>{" "}
-                    <MarkdownRenderer
-                      content={formData.architectureConstraints}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+              // Check if group is completely empty
+              const hasVisibleDynamic = sectionsInGroup.some(
+                (s) => sectionToggles[s.id] && formData[s.id],
+              );
+              const hasSkills = isOverview && selectedSkills.length > 0;
+              const hasGroupWork =
+                isTaskSpec && formData.groupWorkPermitted === "Yes";
 
-            {/* Deliverables */}
-            {(sectionToggles.deliverables ||
-              sectionToggles.submissionInstructions) && (
-              <div className="mb-8 break-inside-avoid print:break-inside-avoid">
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                  Deliverables
-                </h3>
-                {sectionToggles.deliverables && (
-                  <MarkdownRenderer content={formData.deliverables} />
-                )}
-                {sectionToggles.submissionInstructions && (
-                  <>
-                    <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
-                      Submission Instructions:
-                    </h4>
-                    <MarkdownRenderer
-                      content={formData.submissionInstructions}
-                    />
-                  </>
-                )}
-              </div>
-            )}
+              if (!hasVisibleDynamic && !hasSkills && !hasGroupWork)
+                return null;
 
-            {/* Resources & Contact */}
-            {(sectionToggles.resourcesHints || sectionToggles.contactInfo) && (
-              <div className="mb-8 break-inside-avoid print:break-inside-avoid">
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                  Resources &amp; Contact
-                </h3>
-                {sectionToggles.resourcesHints && (
-                  <MarkdownRenderer content={formData.resourcesHints} />
-                )}
-                {sectionToggles.contactInfo && (
-                  <>
-                    <h4 className="font-bold mt-4 mb-2 print:break-after-avoid">
-                      Contact Information:
-                    </h4>
-                    <MarkdownRenderer content={formData.contactInfo} />
-                  </>
-                )}
-              </div>
-            )}
+              return (
+                <div
+                  key={groupTitle}
+                  className="mb-8 break-inside-avoid print:break-inside-avoid"
+                >
+                  <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+                    {groupTitle}
+                  </h3>
+
+                  {/* Special Injections based on Group */}
+                  {isTaskSpec && hasGroupWork && (
+                    <div className="mb-4">
+                      <strong>
+                        Group Mechanics (Target Size: {formData.groupSize}):
+                      </strong>{" "}
+                      <MarkdownRenderer
+                        content={formData.groupMechanics as string}
+                      />
+                    </div>
+                  )}
+
+                  {/* Render standard configured sections */}
+                  {sectionsInGroup.map((s) => {
+                    if (!sectionToggles[s.id] || !formData[s.id]) return null;
+                    return (
+                      <div key={s.id} className="mb-4">
+                        {s.pdfLabelStyle === "inline" && (
+                          <strong>{s.label}: </strong>
+                        )}
+                        {s.pdfLabelStyle === "heading" && (
+                          <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
+                            {s.label}:
+                          </h4>
+                        )}
+                        <MarkdownRenderer content={formData[s.id] as string} />
+                      </div>
+                    );
+                  })}
+
+                  {/* Special Injection for Skills at end of Overview */}
+                  {isOverview && hasSkills && (
+                    <div className="mb-3">
+                      <strong>Employability Skills:</strong>{" "}
+                      {selectedSkills.join(", ")}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {/* Academic Integrity */}
             <div className="mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
@@ -1509,11 +1402,11 @@ export default function BriefGenerator() {
                       </p>
                       <p className="mb-2">
                         <strong>Permitted Uses:</strong>{" "}
-                        {formData.aiAmberPermitted}
+                        {formData.aiAmberPermitted as string}
                       </p>
                       <p className="mb-3">
                         <strong>Prohibited Uses:</strong>{" "}
-                        {formData.aiAmberProhibited}
+                        {formData.aiAmberProhibited as string}
                       </p>
                       <p className="italic">
                         <strong className="not-italic">
@@ -1536,7 +1429,7 @@ export default function BriefGenerator() {
                       </p>
                       <p className="mb-3">
                         <strong>Permitted Uses:</strong>{" "}
-                        {formData.aiGreenPermitted}
+                        {formData.aiGreenPermitted as string}
                       </p>
                       <p className="italic">
                         <strong className="not-italic">
