@@ -144,9 +144,15 @@ const MarkdownRenderer = ({
           img: ({ node, src, alt, ...props }) => {
             if (!src) return null;
 
+            // Ensure TypeScript knows we are dealing with a string
+            let finalSrc = src as string;
+
             // Intercept our custom attachment scheme
-            let finalSrc = src;
-            if (src.startsWith("attachment:") && images) {
+            if (
+              typeof src === "string" &&
+              src.startsWith("attachment:") &&
+              images
+            ) {
               const imgId = src.replace("attachment:", "");
               finalSrc = images[imgId] || src;
             }
@@ -156,7 +162,7 @@ const MarkdownRenderer = ({
             let imgWidth: string | undefined = undefined;
             let imgAlign = "center"; // default position
 
-            if (alt && alt.includes("|")) {
+            if (alt && typeof alt === "string" && alt.includes("|")) {
               const parts = alt.split("|").map((p) => p.trim());
 
               // Check if the last part is an alignment keyword
