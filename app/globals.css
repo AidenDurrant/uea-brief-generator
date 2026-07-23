@@ -1,26 +1,139 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* --- Font theme tokens (Tailwind v4) --- */
+@theme {
+    --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* --- Material-style scrollbar --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+    background-clip: padding-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --- Smooth transitions for all interactive elements --- */
+input,
+textarea,
+select,
+button {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* --- Markdown Typography --- */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+    font-weight: 700;
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    color: #000;
+}
+.markdown-content p {
+    margin-bottom: 0.75em;
+}
+.markdown-content ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin-bottom: 0.75em;
+}
+.markdown-content ol {
+    list-style-type: decimal;
+    padding-left: 1.5em;
+    margin-bottom: 0.75em;
+}
+.markdown-content code {
+    background: #f1f5f9;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    border: 1px solid #e2e8f0;
+}
+.markdown-content strong {
+    font-weight: 700;
+}
+
+/* --- Print Styles --- */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 20mm !important; /* Applies a uniform margin to EVERY printed page */
+    }
+
+    html,
+    body {
+        background-color: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .print-bg-gray-light {
+        background-color: #f9fafb !important;
+    }
+    .print-bg-gray {
+        background-color: #f3f4f6 !important;
+    }
+    .print-bg-red {
+        background-color: #fecaca !important;
+    }
+    .print-bg-yellow {
+        background-color: #fef08a !important;
+    }
+    .print-bg-green {
+        background-color: #bbf7d0 !important;
+    }
+
+    /* Remove the web preview container constraints */
+    .pdf-page {
+        zoom: 1 !important;
+        width: auto !important; /* Let the browser dictate width */
+        min-height: 0 !important;
+        padding: 0 !important; /* Strip web padding, rely on @page margin */
+        margin: 0 !important;
+        box-shadow: none !important;
+        display: block !important;
+    }
+
+    /* Strict Page Break Rules */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+
+    .markdown-content p,
+    .markdown-content ul,
+    .markdown-content li,
+    table,
+    tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
 }
