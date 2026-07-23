@@ -113,13 +113,49 @@ const formatDateTime = (dateString?: string, description?: string) => {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const MarkdownRenderer = ({ content }: { content: string }) => (
-  <div className="markdown-content text-[11pt] leading-relaxed text-black">
-    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-      {content}
-    </ReactMarkdown>
-  </div>
-);
+const MarkdownRenderer = ({
+  content,
+  images,
+}: {
+  content: string;
+  images?: Record<string, string>;
+}) => {
+  return (
+    <div className="markdown-content text-[11pt] leading-relaxed text-black">
+      <style>{`
+        .markdown-content img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 6px;
+          margin: 1rem 0;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+      `}</style>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        // Disable strict URL sanitization so our local attachment links don't get stripped out
+        urlTransform={(value: string) => value}
+        components={{
+          img: ({ node, src, alt, ...props }) => {
+            if (!src) return null;
+
+            // Intercept our custom attachment scheme and map it to the base64 dictionary
+            let finalSrc = src;
+            if (src.startsWith("attachment:") && images) {
+              const imgId = src.replace("attachment:", "");
+              finalSrc = images[imgId] || src;
+            }
+
+            return <img src={finalSrc} alt={alt || ""} {...props} />;
+          },
+        }}
+      >
+        {content || ""}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 function SectionHeading({ step, title }: { step: number; title: string }) {
   return (
@@ -239,6 +275,10 @@ export default function BriefGenerator() {
   });
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(
+    {},
+  );
+
   const [rubricRows, setRubricRows] = useState([
     {
       id: Date.now(),
@@ -292,6 +332,7 @@ export default function BriefGenerator() {
           setSectionToggles((prev) => ({ ...prev, ...parsed.sectionToggles }));
         if (parsed.selectedSkills) setSelectedSkills(parsed.selectedSkills);
         if (parsed.rubricRows) setRubricRows(parsed.rubricRows);
+        if (parsed.uploadedImages) setUploadedImages(parsed.uploadedImages);
       } catch (error) {
         console.error("Failed to parse local storage draft:", error);
       }
@@ -302,9 +343,22 @@ export default function BriefGenerator() {
   // 3. Auto-save Draft
   useEffect(() => {
     if (!isLoaded) return;
-    const draft = { formData, sectionToggles, selectedSkills, rubricRows };
+    const draft = {
+      formData,
+      sectionToggles,
+      selectedSkills,
+      rubricRows,
+      uploadedImages,
+    };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
-  }, [formData, sectionToggles, selectedSkills, rubricRows, isLoaded]);
+  }, [
+    formData,
+    sectionToggles,
+    selectedSkills,
+    rubricRows,
+    uploadedImages,
+    isLoaded,
+  ]);
 
   // 4. Clear Draft Handler
   const handleClearDraft = () => {
@@ -396,7 +450,7 @@ export default function BriefGenerator() {
   ) => {
     setFormData((p) => ({
       ...p,
-      submissionDates: p.submissionDates.map((d) =>
+      submissionDates: p.submissionDates.map((d: any) =>
         d.id === id ? { ...d, [field]: val } : d,
       ),
     }));
@@ -405,8 +459,57 @@ export default function BriefGenerator() {
   const removeSubmissionDate = (id: number) => {
     setFormData((p) => ({
       ...p,
-      submissionDates: p.submissionDates.filter((d) => d.id !== id),
+      submissionDates: p.submissionDates.filter((d: any) => d.id !== id),
     }));
+  };
+
+  // Image Upload Logic (Compress to avoid localStorage limits)
+  const handleImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldId: string,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        } else if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress JPEG to 70% quality to save huge amounts of space
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        const imgId = "img-" + Date.now();
+
+        setUploadedImages((prev) => ({ ...prev, [imgId]: dataUrl }));
+        setFormData((prev) => ({
+          ...prev,
+          [fieldId]:
+            (prev[fieldId] || "") + `\n\n![Image](attachment:${imgId})\n`,
+        }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ""; // Reset input so same file can be uploaded again if needed
   };
 
   const currentAssessment =
@@ -868,9 +971,43 @@ export default function BriefGenerator() {
               {formData.groupWorkPermitted === "Yes" && (
                 <div className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
-                      Group Mechanics
-                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                        Group Mechanics
+                      </label>
+                      <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1 shadow-sm">
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect
+                            x="3"
+                            y="3"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          ></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleImageUpload(e, "groupMechanics")
+                          }
+                        />
+                      </label>
+                    </div>
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
@@ -918,9 +1055,43 @@ export default function BriefGenerator() {
                     <div
                       className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
                     >
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        {f.label}
-                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          {f.label}
+                        </label>
+                        {isVisible && (
+                          <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
+                            <svg
+                              width="10"
+                              height="10"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <rect
+                                x="3"
+                                y="3"
+                                width="18"
+                                height="18"
+                                rx="2"
+                                ry="2"
+                              ></rect>
+                              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                              <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Add Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleImageUpload(e, f.id)}
+                            />
+                          </label>
+                        )}
+                      </div>
                       <VisibilityToggle
                         checked={isVisible}
                         onChange={() => toggleSection(f.id)}
@@ -1247,6 +1418,7 @@ export default function BriefGenerator() {
                       </strong>{" "}
                       <MarkdownRenderer
                         content={formData.groupMechanics as string}
+                        images={uploadedImages}
                       />
                     </div>
                   )}
@@ -1264,7 +1436,10 @@ export default function BriefGenerator() {
                             {s.label}:
                           </h4>
                         )}
-                        <MarkdownRenderer content={formData[s.id] as string} />
+                        <MarkdownRenderer
+                          content={formData[s.id] as string}
+                          images={uploadedImages}
+                        />
                       </div>
                     );
                   })}
