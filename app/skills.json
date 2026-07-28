@@ -1,12 +1,42 @@
 [
-  "Problem Solving",
-  "Critical Thinking",
-  "Teamwork",
-  "Communication",
-  "Data Analysis",
-  "Technical Implementation",
-  "Presentation",
-  "Leadership",
-  "Time Management",
-  "Commercial Awareness"
+  {
+    "name": "Problem Solving",
+    "description": "The ability to find solutions to difficult or complex issues."
+  },
+  {
+    "name": "Critical Thinking",
+    "description": "The objective analysis and evaluation of an issue in order to form a judgement."
+  },
+  {
+    "name": "Teamwork",
+    "description": "The combined action of a group of people, especially when effective and efficient."
+  },
+  {
+    "name": "Communication",
+    "description": "The imparting or exchanging of information or news effectively."
+  },
+  {
+    "name": "Data Analysis",
+    "description": "The process of evaluating data using analytical and logical reasoning to examine each component."
+  },
+  {
+    "name": "Technical Implementation",
+    "description": "The practical application of engineering, mathematical, and software principles."
+  },
+  {
+    "name": "Presentation",
+    "description": "The ability to communicate ideas clearly and effectively to an audience."
+  },
+  {
+    "name": "Leadership",
+    "description": "The action of leading a group of people or an organisation."
+  },
+  {
+    "name": "Time Management",
+    "description": "The ability to use one's time effectively or productively, especially at work."
+  },
+  {
+    "name": "Commercial Awareness",
+    "description": "An understanding of how industries and businesses operate and make money."
+  }
 ]
