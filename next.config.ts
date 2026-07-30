@@ -1,14 +1,27 @@
 import type { NextConfig } from "next";
 
+const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "";
+const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true";
+const isUserOrOrganisationSite = repositoryName.endsWith(".github.io");
+
+// Project Pages sites are served from /repository-name. User/organisation Pages
+// sites and local development are served from the domain root.
+const basePath =
+  isGitHubPagesBuild && repositoryName && !isUserOrOrganisationSite
+    ? `/${repositoryName}`
+    : "";
+
 const nextConfig: NextConfig = {
-  /* config options here */
   output: "export",
+  basePath,
+  trailingSlash: true,
 
-  // IF you are deploying to a project repo (e.g., https://username.github.io/my-repo-name)
-  // uncomment the next line and add your exact repo name:
-  // basePath: '/my-repo-name',
+  // Expose the build-time path so public assets can include it explicitly.
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+  },
 
-  // Disable image optimization because GitHub Pages doesn't have a Node.js server
+  // GitHub Pages has no Next.js image optimisation server.
   images: {
     unoptimized: true,
   },

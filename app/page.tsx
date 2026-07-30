@@ -10,6 +10,7 @@ import TEMPLATE from "./template.json";
 // ─── Constants & Extracted Text ───────────────────────────────────────────────
 const DRAFT_STORAGE_KEY = "uea_brief_draft_v2";
 const DB_STORAGE_KEY = "uea_briefs_db";
+const PUBLIC_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const DEFAULT_STATIC_CONTENT = {
   academicIntegrity: {
@@ -801,7 +802,7 @@ export default function BriefGenerator() {
               </button>
 
               <img
-                src="/UEA_Logo_BLK_MONO_N_A_59244.png"
+                src={`${PUBLIC_BASE_PATH}/UEA_Logo_BLK_MONO_N_A_59244.png`}
                 alt="UEA"
                 className="editor-logo"
                 style={{
@@ -1857,7 +1858,7 @@ export default function BriefGenerator() {
               {/* PDF Header */}
               <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
                 <img
-                  src="/UEA_Logo_BLK_MONO_N_A_59244.png"
+                  src={`${PUBLIC_BASE_PATH}/UEA_Logo_BLK_MONO_N_A_59244.png`}
                   alt="University of East Anglia"
                   className="corporate-document-logo"
                 />
