@@ -210,7 +210,7 @@ const MarkdownRenderer = ({
 
 function SectionHeading({ step, title }: { step: number; title: string }) {
   return (
-    <div className="flex items-center gap-3 mb-6">
+    <div className="section-heading flex items-center gap-3 mb-6">
       <div className="flex items-center justify-center shrink-0 text-xs font-bold select-none bg-indigo-50 text-indigo-600 rounded-full w-6 h-6">
         {step}
       </div>
@@ -221,7 +221,7 @@ function SectionHeading({ step, title }: { step: number; title: string }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-medium text-slate-400 mb-1.5">
+    <label className="block text-xs font-medium text-slate-400 mb-1.5 flex-1">
       {children}
     </label>
   );
@@ -253,22 +253,18 @@ function VisibilityToggle({
   onChange: () => void;
 }) {
   return (
-    <div className="flex bg-slate-200 p-1 rounded-lg select-none items-center shadow-inner">
-      <button
-        type="button"
-        onClick={() => !checked && onChange()}
-        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${checked ? "bg-indigo-600 text-white shadow-md" : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"}`}
-      >
-        Visible
-      </button>
-      <button
-        type="button"
-        onClick={() => checked && onChange()}
-        className={`px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md transition-all duration-200 ${!checked ? "bg-slate-600 text-white shadow-md" : "text-slate-500 hover:text-slate-700 hover:bg-slate-300/50"}`}
-      >
-        Hidden
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onChange}
+      className="visibility-toggle"
+      aria-pressed={checked}
+      aria-label={checked ? "Hide section" : "Show section"}
+    >
+      <span className="visibility-toggle-track" data-checked={checked}>
+        <span className="visibility-toggle-thumb" />
+      </span>
+      <span>{checked ? "Visible" : "Hidden"}</span>
+    </button>
   );
 }
 
@@ -330,7 +326,7 @@ export default function BriefGenerator() {
   const [briefsList, setBriefsList] = useState<any[]>([]);
   const [currentBriefId, setCurrentBriefId] = useState<string | null>(null);
 
-  // Form States (Safely initialized to prevent undefined mapping crashes)
+  // Form States
   const [formData, setFormData] = useState<Record<string, any>>(
     defaults.formData,
   );
@@ -340,6 +336,7 @@ export default function BriefGenerator() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>(
     defaults.selectedSkills,
   );
+  const [expandedSkills, setExpandedSkills] = useState<string[]>([]); // Tracks which skill descriptions are open
   const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(
     defaults.uploadedImages,
   );
@@ -362,7 +359,6 @@ export default function BriefGenerator() {
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
-        // Merge saved data strictly over defaults to guarantee the schema is completely intact
         setFormData({ ...defaults.formData, ...(parsed.formData || {}) });
         setSectionToggles({
           ...defaults.sectionToggles,
@@ -436,6 +432,7 @@ export default function BriefGenerator() {
     setFormData(defaults.formData);
     setSectionToggles(defaults.sectionToggles);
     setSelectedSkills(defaults.selectedSkills);
+    setExpandedSkills([]);
     setRubricRows(defaults.rubricRows);
     setUploadedImages(defaults.uploadedImages);
     setCurrentBriefId(null);
@@ -453,6 +450,7 @@ export default function BriefGenerator() {
       ...(brief.sectionToggles || {}),
     });
     setSelectedSkills(brief.selectedSkills || defaults.selectedSkills);
+    setExpandedSkills([]);
     setRubricRows(
       brief.rubricRows?.length ? brief.rubricRows : defaults.rubricRows,
     );
@@ -520,10 +518,18 @@ export default function BriefGenerator() {
 
   const toggleSection = (key: string) =>
     setSectionToggles((prev) => ({ ...prev, [key]: !prev[key] }));
+
   const toggleSkill = (s: string) =>
     setSelectedSkills((p) =>
       p.includes(s) ? p.filter((x) => x !== s) : [...p, s],
     );
+
+  const toggleSkillExpand = (name: string) => {
+    setExpandedSkills((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name],
+    );
+  };
+
   const addRubricRow = () =>
     setRubricRows([
       ...rubricRows,
@@ -646,12 +652,12 @@ export default function BriefGenerator() {
         ASSESSMENT_METHODS[0];
 
   return (
-    <div className="flex h-screen w-full overflow-hidden font-sans bg-slate-900 print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="app-shell flex h-screen w-full overflow-hidden font-sans bg-slate-900 print:block print:h-auto print:overflow-visible print:bg-white">
       {/* ═══════════════════════════════════════════════════════════
           SIDEBAR — Database Form Manager
       ═══════════════════════════════════════════════════════════ */}
       <div
-        className="shrink-0 flex flex-col bg-slate-900 shadow-2xl text-slate-300 print:hidden z-30 transition-all duration-300 ease-in-out overflow-hidden border-slate-800"
+        className="brief-sidebar shrink-0 flex flex-col bg-slate-900 shadow-2xl text-slate-300 print:hidden z-30 transition-all duration-300 ease-in-out overflow-hidden border-slate-800"
         style={{
           width: isSidebarOpen ? 256 : 0,
           opacity: isSidebarOpen ? 1 : 0,
@@ -749,17 +755,17 @@ export default function BriefGenerator() {
 
       <div
         ref={containerRef}
-        className="flex-1 flex overflow-hidden bg-white relative"
+        className="workspace-shell flex-1 flex overflow-hidden bg-white relative"
       >
         {/* ═══════════════════════════════════════════════════════════
             LEFT — Editor
         ═══════════════════════════════════════════════════════════ */}
         <div
-          className="h-full flex flex-col print:hidden shrink-0 overflow-hidden"
+          className="editor-panel h-full flex flex-col print:hidden shrink-0 overflow-hidden"
           style={{ width: `${panelWidth}%`, minWidth: 300 }}
         >
           <header
-            className="shrink-0 flex items-center justify-between shadow-sm z-20"
+            className="editor-toolbar shrink-0 flex items-center justify-between z-20"
             style={{
               background: "#fff",
               borderBottom: "1px solid #e8eaed",
@@ -773,7 +779,7 @@ export default function BriefGenerator() {
               {/* Hamburger Menu Toggle */}
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1"
+                className="toolbar-icon-button p-2 text-slate-500 hover:text-indigo-600 transition-colors mr-1"
                 title="Toggle Sidebar"
               >
                 <svg
@@ -797,7 +803,13 @@ export default function BriefGenerator() {
               <img
                 src="/UEA_Logo_BLK_MONO_N_A_59244.png"
                 alt="UEA"
-                style={{ width: 150, height: 36 }}
+                className="editor-logo"
+                style={{
+                  width: 150,
+                  height: 36,
+                  objectFit: "contain",
+                  objectPosition: "left center",
+                }}
               />
               <div className="hidden xl:block ml-2">
                 <h1
@@ -820,14 +832,14 @@ export default function BriefGenerator() {
               <button
                 type="button"
                 onClick={handleClearDraft}
-                className="hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors active:scale-95"
+                className="toolbar-action toolbar-action-muted hidden xl:flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-500 transition-colors active:scale-95"
               >
                 Clear Draft
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors active:scale-95"
+                className="toolbar-action toolbar-action-muted flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-500 transition-colors active:scale-95"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -851,7 +863,7 @@ export default function BriefGenerator() {
               <button
                 type="button"
                 onClick={handleSaveToDatabase}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors active:scale-95 shadow-sm"
+                className="toolbar-action toolbar-action-primary flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white transition-colors active:scale-95"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -874,24 +886,9 @@ export default function BriefGenerator() {
             </div>
           </header>
 
-          <div
-            className="flex-1 overflow-y-auto space-y-6"
-            style={{
-              background: "#f5f6fa",
-              paddingLeft: 56,
-              paddingRight: 56,
-              paddingTop: 32,
-              paddingBottom: 80,
-            }}
-          >
+          <div className="editor-content flex-1 overflow-y-auto space-y-6">
             {/* 1 — Header Details */}
-            <section
-              className="bg-white rounded-xl p-8"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card">
               <SectionHeading step={1} title="Header Details" />
               <div className="flex flex-col space-y-5">
                 {/* Dynamic Headers from JSON */}
@@ -1005,13 +1002,7 @@ export default function BriefGenerator() {
             </section>
 
             {/* 2 — Assessment Type */}
-            <section
-              className="bg-white rounded-xl p-8"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card">
               <SectionHeading step={2} title="Assessment Method" />
               <div>
                 <FieldLabel>Type of Assessment</FieldLabel>
@@ -1088,13 +1079,7 @@ export default function BriefGenerator() {
             </section>
 
             {/* 3 — Policies & Skills */}
-            <section
-              className="bg-white rounded-xl p-8"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card">
               <SectionHeading step={3} title="Policies & Skills" />
               <div className="mb-0">
                 <FieldLabel>Group Work</FieldLabel>
@@ -1160,70 +1145,146 @@ export default function BriefGenerator() {
                   paddingTop: 28,
                 }}
               >
-                <FieldLabel>Employability Skills Assessed</FieldLabel>
+                <div className="flex items-end justify-between mb-3">
+                  <FieldLabel>Employability Skills Assessed</FieldLabel>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-md mb-1.5 border border-indigo-100/50">
+                    {selectedSkills.length} Selected
+                  </span>
+                </div>
+
                 <div
-                  className="mt-4 max-h-[340px] overflow-y-auto border border-slate-200 rounded-2xl bg-slate-50/50 p-3 space-y-2 shadow-inner"
+                  className="max-h-[600px] overflow-y-auto border border-slate-200 rounded-2xl bg-slate-50/50 p-3 shadow-inner"
                   style={{ scrollbarWidth: "thin" }}
                 >
-                  {SKILLS_LIST.map((skillItem: any) => {
-                    const skillName =
-                      typeof skillItem === "string"
-                        ? skillItem
-                        : skillItem.name;
-                    const skillDesc =
-                      typeof skillItem === "string"
-                        ? ""
-                        : skillItem.description;
-                    const on = selectedSkills.includes(skillName);
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {SKILLS_LIST.map((skillItem: any) => {
+                      const skillName =
+                        typeof skillItem === "string"
+                          ? skillItem
+                          : skillItem.name;
+                      const skillDesc =
+                        typeof skillItem === "string"
+                          ? ""
+                          : skillItem.description;
+                      const on = selectedSkills.includes(skillName);
+                      const isExpanded = expandedSkills.includes(skillName);
 
-                    return (
-                      <label
-                        key={skillName}
-                        className={`group flex items-start gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 border ${
-                          on
-                            ? "bg-indigo-50 border-indigo-300 shadow-sm shadow-indigo-100"
-                            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center shrink-0 mt-0.5">
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => toggleSkill(skillName)}
-                            className="w-5 h-5 cursor-pointer accent-indigo-600 transition-all"
-                          />
-                        </div>
-                        <div className="flex flex-col flex-1">
-                          <span
-                            className={`text-[12px] font-extrabold uppercase tracking-widest ${on ? "text-indigo-900" : "text-slate-700"}`}
-                          >
-                            {skillName}
-                          </span>
-                          {skillDesc && (
-                            <span
-                              className={`text-[13px] mt-1 font-medium leading-relaxed ${on ? "text-indigo-700/90" : "text-slate-500"}`}
+                      return (
+                        <div
+                          key={skillName}
+                          className={`flex flex-col transition-all duration-300 border rounded-xl overflow-hidden ${
+                            isExpanded ? "col-span-1 lg:col-span-2" : ""
+                          } ${
+                            on
+                              ? "bg-indigo-50 border-indigo-300 shadow-md shadow-indigo-100/50"
+                              : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full h-14">
+                            <label className="flex items-center gap-3 pl-4 py-3 cursor-pointer flex-1 h-full">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() => toggleSkill(skillName)}
+                                className="w-4 h-4 cursor-pointer accent-indigo-600 transition-all"
+                              />
+                              <span
+                                className={`text-[12px] font-extrabold uppercase tracking-widest ${on ? "text-indigo-900" : "text-slate-700"}`}
+                              >
+                                {skillName}
+                              </span>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleSkillExpand(skillName)}
+                              className={`h-full px-4 flex items-center justify-center transition-colors border-l ${
+                                on
+                                  ? "border-indigo-200 hover:bg-indigo-100/50 text-indigo-500"
+                                  : "border-slate-100 hover:bg-slate-50 text-slate-400"
+                              }`}
+                              title={
+                                isExpanded ? "Hide Details" : "Show Details"
+                              }
                             >
-                              {skillDesc}
-                            </span>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Expanded Level Rubric Box */}
+                          {isExpanded && (
+                            <div
+                              className={`px-4 pb-4 border-t ${on ? "border-indigo-200/60" : "border-slate-100"} cursor-default`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {skillDesc && (
+                                <p
+                                  className={`text-[13px] mt-3 font-medium leading-relaxed ${on ? "text-indigo-800" : "text-slate-500"}`}
+                                >
+                                  {skillDesc}
+                                </p>
+                              )}
+
+                              {skillItem.levels && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
+                                  {["3", "4", "5", "6"].map((lvl) => {
+                                    const criteria = skillItem.levels[lvl];
+                                    if (!criteria || criteria.length === 0)
+                                      return null;
+                                    return (
+                                      <div
+                                        key={lvl}
+                                        className={`rounded-lg p-3 shadow-sm flex flex-col ${on ? "bg-white/60 border border-indigo-100/50" : "bg-slate-50 border border-slate-200/60"}`}
+                                      >
+                                        <div
+                                          className={`text-[10px] font-bold mb-2 uppercase tracking-wider border-b pb-1.5 ${on ? "text-indigo-500 border-indigo-100/50" : "text-slate-500 border-slate-200"}`}
+                                        >
+                                          Level {lvl}
+                                        </div>
+                                        <ul className="list-disc pl-4 m-0 space-y-1.5">
+                                          {criteria.map(
+                                            (c: string, idx: number) => (
+                                              <li
+                                                key={idx}
+                                                className={`text-[11px] leading-snug ${on ? "text-slate-700" : "text-slate-600"}`}
+                                              >
+                                                {c}
+                                              </li>
+                                            ),
+                                          )}
+                                        </ul>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </label>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </section>
 
             {/* 4 — AI Policy */}
-            <section
-              className="bg-white rounded-xl p-8"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card">
               <SectionHeading step={4} title="Generative AI Policy" />
-              <div className="grid grid-cols-3 gap-4 mb-7">
+              <div className="ai-policy-grid grid grid-cols-3 gap-4 mb-7">
                 {AI_OPTIONS.map((opt) => {
                   const on = formData.aiPolicy === opt.value;
                   const s = AI_CARD_STATES[opt.value];
@@ -1322,13 +1383,7 @@ export default function BriefGenerator() {
             </section>
 
             {/* 5 — Content Specifications (Dynamic from JSON) */}
-            <section
-              className="bg-white rounded-xl p-8 overflow-hidden box-border"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card overflow-hidden box-border">
               <SectionHeading step={5} title="Content Specifications" />
               <div className="space-y-4 max-w-full">
                 {/* Special Injection for Group Mechanics Editor if Permitted */}
@@ -1489,13 +1544,7 @@ export default function BriefGenerator() {
             </section>
 
             {/* 6 — Evaluation Matrix */}
-            <section
-              className="bg-white rounded-xl p-8 max-w-full overflow-hidden box-border"
-              style={{
-                boxShadow:
-                  "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              }}
-            >
+            <section className="ui-card max-w-full overflow-hidden box-border">
               <SectionHeading step={6} title="Evaluation & Grading" />
               <div className="space-y-4 max-w-full">
                 {/* Loop through JSON content sections (specifically the Eval block) */}
@@ -1650,7 +1699,7 @@ export default function BriefGenerator() {
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 max-w-full box-border">
+                          <div className="rubric-grade-grid grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 max-w-full box-border">
                             {GRADE_BANDS.map((g) => (
                               <div
                                 key={g.key}
@@ -1722,7 +1771,7 @@ export default function BriefGenerator() {
         <div
           role="separator"
           aria-label="Drag to resize"
-          className="h-full shrink-0 z-20 print:hidden select-none flex items-center justify-center bg-slate-100 border-l border-r border-slate-200"
+          className="panel-divider h-full shrink-0 z-20 print:hidden select-none flex items-center justify-center bg-slate-100 border-l border-r border-slate-200"
           style={{
             width: 20,
             cursor: "col-resize",
@@ -1772,7 +1821,7 @@ export default function BriefGenerator() {
         {/* ═══════════════════════════════════════════════════════════
             RIGHT — PDF Preview
         ═══════════════════════════════════════════════════════════ */}
-        <div className="flex-1 h-full flex flex-col overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white print:p-0 print:m-0">
+        <div className="preview-panel flex-1 h-full flex flex-col overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white print:p-0 print:m-0">
           {/* Zoom toolbar */}
           <div className="flex items-center justify-between px-5 py-2.5 bg-slate-800 border-b border-slate-900/60 shrink-0 print:hidden">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
@@ -1802,11 +1851,16 @@ export default function BriefGenerator() {
           {/* Document canvas */}
           <div className="flex-1 overflow-auto bg-slate-700 p-10 flex justify-center items-start print:p-0 print:block print:h-auto print:overflow-visible print:bg-white print:m-0">
             <div
-              className="pdf-page box-border mx-auto bg-white text-black font-serif shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
+              className="pdf-page corporate-document box-border mx-auto bg-white text-black shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
               style={{ zoom: zoom / 100 }}
             >
               {/* PDF Header */}
-              <div className="mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
+              <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
+                <img
+                  src="/UEA_Logo_BLK_MONO_N_A_59244.png"
+                  alt="University of East Anglia"
+                  className="corporate-document-logo"
+                />
                 <h1 className="text-3xl font-bold uppercase tracking-widest">
                   {TEMPLATE.documentTitles?.institution ||
                     "University of East Anglia"}
@@ -1820,7 +1874,7 @@ export default function BriefGenerator() {
               </div>
 
               {/* Details table (Dynamically mapped from JSON) */}
-              <table className="w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
+              <table className="corporate-meta-table w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
                 <tbody>
                   {TEMPLATE.headerFields
                     .filter((f) => f.id !== "school" && f.id !== "programme")
@@ -1902,9 +1956,9 @@ export default function BriefGenerator() {
                 return (
                   <div
                     key={groupTitle}
-                    className="mb-8 break-inside-avoid print:break-inside-avoid"
+                    className="corporate-section mb-8 break-inside-avoid print:break-inside-avoid"
                   >
-                    <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+                    <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
                       {groupTitle}
                     </h3>
 
@@ -1944,15 +1998,15 @@ export default function BriefGenerator() {
 
                     {/* Special Injection for Skills at end of Overview */}
                     {isOverview && hasSkills && (
-                      <div className="mb-3">
-                        <strong>Employability Skills:</strong>{" "}
+                      <div className="mb-3 mt-6 text-[11pt]">
+                        <strong>Employability Skills Assessed:</strong>{" "}
                         {selectedSkills.join(", ")}
                       </div>
                     )}
 
                     {/* Special Injection for Grading Matrix at end of Evaluation block */}
                     {hasGradingMatrix && (
-                      <table className="table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
+                      <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
                         <thead className="break-inside-avoid print:break-inside-avoid">
                           <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
                             <th className="border-r border-black p-1.5 w-[14%]">
@@ -2019,17 +2073,17 @@ export default function BriefGenerator() {
               })}
 
               {/* Academic Integrity */}
-              <div className="mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
-                <p className="font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
+              <div className="corporate-integrity mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
+                <p className="corporate-warning font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
                   {staticContent.academicIntegrity.warning}
                 </p>
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
+                <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
                   {staticContent.academicIntegrity.title}
                 </h3>
                 <MarkdownRenderer
                   content={staticContent.academicIntegrity.body}
                 />
-                <div className="p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
+                <div className="corporate-notice p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
                   {staticContent.academicIntegrity.groupWorkPrefix}{" "}
                   <strong className="uppercase font-extrabold">
                     {formData.groupWorkPermitted === "Yes"
@@ -2043,8 +2097,8 @@ export default function BriefGenerator() {
               </div>
 
               {/* AI Policy */}
-              <div className="mb-8">
-                <h3 className="text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+              <div className="corporate-ai-section mb-8">
+                <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
                   {staticContent.aiPolicy.title}
                 </h3>
                 <p className="mb-4 text-[11pt] leading-relaxed">
@@ -2052,7 +2106,7 @@ export default function BriefGenerator() {
                 </p>
 
                 <div className="break-inside-avoid print:break-inside-avoid">
-                  <table className="table-fixed w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
+                  <table className="corporate-ai-tiers table-fixed w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
                     <tbody>
                       <tr>
                         <td
@@ -2073,7 +2127,10 @@ export default function BriefGenerator() {
                       </tr>
                     </tbody>
                   </table>
-                  <div className="border-[2px] border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6">
+                  <div
+                    className="corporate-policy-box border-2 border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6"
+                    data-policy={formData.aiPolicy}
+                  >
                     {formData.aiPolicy === "RED" && (
                       <>
                         <h4 className="font-bold text-red-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">

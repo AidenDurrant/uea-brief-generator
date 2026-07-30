@@ -1,42 +1,516 @@
 [
   {
-    "name": "Problem Solving",
-    "description": "The ability to find solutions to difficult or complex issues."
-  },
-  {
-    "name": "Critical Thinking",
-    "description": "The objective analysis and evaluation of an issue in order to form a judgement."
+    "name": "Communication",
+    "description": "The imparting or exchanging of information or news effectively.",
+    "levels": {
+      "3": [
+        "Work successfully in groups of 3+",
+        "Deliver presentations on completed work"
+      ],
+      "4": [
+        "Work successfully in groups of 3+",
+        "Deliver clear presentations on completed work",
+        "Convey points in a clear manner to a knowledgeable audience",
+        "Answer questions about your work"
+      ],
+      "5": [
+        "Work successfully in groups of 3+",
+        "Deliver clear, concise presentations on completed work",
+        "Convey points in a clear manner to a mixed knowledge audience",
+        "Confidently answer questions about your work"
+      ],
+      "6": [
+        "Work successfully in groups of 3+",
+        "Deliver clear, concise presentations on completed work",
+        "Convey points in a clear and understandable manner to an audience of any knowledge",
+        "Engage in dialogue about work completed"
+      ]
+    }
   },
   {
     "name": "Teamwork",
-    "description": "The combined action of a group of people, especially when effective and efficient."
-  },
-  {
-    "name": "Communication",
-    "description": "The imparting or exchanging of information or news effectively."
-  },
-  {
-    "name": "Data Analysis",
-    "description": "The process of evaluating data using analytical and logical reasoning to examine each component."
-  },
-  {
-    "name": "Technical Implementation",
-    "description": "The practical application of engineering, mathematical, and software principles."
-  },
-  {
-    "name": "Presentation",
-    "description": "The ability to communicate ideas clearly and effectively to an audience."
-  },
-  {
-    "name": "Leadership",
-    "description": "The action of leading a group of people or an organisation."
+    "description": "The combined action of a group of people, especially when effective and efficient.",
+    "levels": {
+      "3": ["Work successfully in groups"],
+      "4": [
+        "Work successfully in groups",
+        "Adequately support group members with issues"
+      ],
+      "5": [
+        "Work successfully in groups",
+        "Adequately support group members with issues",
+        "Appropriately deal with conflicts / challenges",
+        "Use of collaborative development software tools"
+      ],
+      "6": [
+        "Work successfully in groups",
+        "Adequately support group members with issues",
+        "Appropriately deal with conflicts / challenges",
+        "Adapt to and fill any required role within a team",
+        "Better use of collaborative development software tools"
+      ]
+    }
   },
   {
     "name": "Time Management",
-    "description": "The ability to use one's time effectively or productively, especially at work."
+    "description": "The ability to use one's time effectively or productively, especially at work.",
+    "levels": {
+      "3": [
+        "Prioritise tasks",
+        "Complete all required tasks within the deadline"
+      ],
+      "4": [
+        "Complete all required tasks within the deadline",
+        "Manage and prioritise overlapping tasks",
+        "Present within time limits"
+      ],
+      "5": [
+        "Complete all required tasks within the deadline",
+        "Complete some additional tasks within the deadline",
+        "Effectively manage and prioritise multiple overlapping tasks",
+        "Effectively present within time limits",
+        "Leave adequate time to handle unexpected challenges or delays"
+      ],
+      "6": [
+        "Complete all required tasks well within deadline",
+        "Complete most additional tasks within the deadline",
+        "Effectively manage and prioritise multiple overlapping tasks",
+        "Effectively present within time limits",
+        "Complete tasks within a tight deadline",
+        "Leave adequate time to handle unexpected challenges or delays"
+      ]
+    }
+  },
+  {
+    "name": "Critical Thinking",
+    "description": "The objective analysis and evaluation of an issue in order to form a judgement.",
+    "levels": {
+      "3": ["Justify design decisions with some good rationale"],
+      "4": [
+        "Justify design decisions with some good rationale",
+        "Evidence additional consideration and evaluation of approach"
+      ],
+      "5": [
+        "Justify design decisions with good rationale for open ended requirements",
+        "Evidence additional consideration and evaluation of approach",
+        "Show some analysis and reasoned insights from results"
+      ],
+      "6": [
+        "Justify design decisions with excellent rationale for open ended requirements",
+        "Evidence additional consideration and evaluation of approach",
+        "Show clear analysis and well reasoned insights from results",
+        "Clear conceptualisation"
+      ]
+    }
+  },
+  {
+    "name": "Networking",
+    "description": "The action or process of interacting with others to exchange information and develop professional or social contacts.",
+    "levels": {
+      "3": ["Awareness of interpersonal relationships and self visibility"],
+      "4": [
+        "Productively communicate with stakeholders",
+        "Awareness of interpersonal relationships and self visibility"
+      ],
+      "5": [
+        "Effectively communicate with stakeholders",
+        "Ideate and collaborate with members outside of group settings",
+        "Understanding of interpersonal relationships and self visibility",
+        "Develop pitching skills"
+      ],
+      "6": [
+        "Effectively and professionally communicate with stakeholders",
+        "Effectively ideate and collaborate with members outside of group settings",
+        "Clear understanding of interpersonal relationships and self visibility",
+        "Advanced pitching skills"
+      ]
+    }
+  },
+  {
+    "name": "Problem Solving",
+    "description": "The ability to find solutions to difficult or complex issues.",
+    "levels": {
+      "3": ["Understand and decompose some problems into core elements"],
+      "4": [
+        "Understand and decompose some problems into core elements",
+        "Independently diagnose issues",
+        "Independently solve simple issues"
+      ],
+      "5": [
+        "Understand and decompose most problems into core elements",
+        "Independently diagnose and solve issues",
+        "Classify and reason issue scope"
+      ],
+      "6": [
+        "Understand and decompose all problems into core elements",
+        "Independently diagnose and solve issues",
+        "Classify and reason issue scope"
+      ]
+    }
+  },
+  {
+    "name": "Ethical Awareness",
+    "description": "An understanding of ethical principles and the ability to apply them in a professional context.",
+    "levels": {
+      "3": ["Awareness of topical ethical issues"],
+      "4": [
+        "Understanding of BCS ethical framework",
+        "Application of legal and ethical restrictions such as on data collection"
+      ],
+      "5": [
+        "Application of ethical frameworks to projects",
+        "Awareness of ongoing ethical discussions in the field",
+        "Good application of legal and ethical restrictions (e.g. data collection)"
+      ],
+      "6": [
+        "Understanding of ongoing ethical discussions in the field",
+        "Appropriately follow UEA's research ethics policies"
+      ]
+    }
   },
   {
     "name": "Commercial Awareness",
-    "description": "An understanding of how industries and businesses operate and make money."
+    "description": "An understanding of how industries and businesses operate and make money.",
+    "levels": {
+      "3": ["Awareness of industrial / commercial applications of content"],
+      "4": [
+        "Awareness of industrial / commercial applications of content",
+        "Able to make and explain links between completed work and industrial settings"
+      ],
+      "5": [
+        "Understanding of industrial / commercial applications of content",
+        "Make and explain clear links between completed work and industrial settings",
+        "Understanding the importance of product/market fit"
+      ],
+      "6": [
+        "Clear understanding of industrial / commercial applications of content",
+        "Able to make and explain clear links between completed work and industrial settings",
+        "Design and justify industrial / commercial projects"
+      ]
+    }
+  },
+  {
+    "name": "Adaptability + Resilience",
+    "description": "The capacity to recover quickly from difficulties and adapt to new conditions.",
+    "levels": {
+      "3": ["Handle repeated setbacks"],
+      "4": ["Handle and overcome repeated setbacks"],
+      "5": [
+        "Handle and overcome repeated setbacks",
+        "Handle and overcome changing technologies (libraries / hardware)"
+      ],
+      "6": [
+        "Handle and overcome repeated setbacks",
+        "Handle and overcome changing technologies (libraries / hardware)",
+        "Handle and overcome changing requirements"
+      ]
+    }
+  },
+  {
+    "name": "Containerisation",
+    "description": "The use of containers to package and deploy applications consistently across different environments.",
+    "levels": {
+      "3": ["Awareness of containerisation"],
+      "4": ["Awareness of containerisation", "Use containers"],
+      "5": [
+        "Understanding of containerisation",
+        "Create and use containers",
+        "Connect multiple containers"
+      ],
+      "6": [
+        "Clear understanding of containerisation",
+        "Create and manage containers",
+        "Connect multiple containers",
+        "Deploy containers on multiple platforms",
+        "Integrate with CI/CD"
+      ]
+    }
+  },
+  {
+    "name": "CI/CD + Agile",
+    "description": "Practices for continuous integration, delivery, and agile project management.",
+    "levels": {
+      "3": ["Awareness of Agile methodology", "Report and develop in sprints"],
+      "4": [
+        "Test driven development",
+        "Sprint planning",
+        "Requirements analysis and breakdown (Stakeholders, Personas)",
+        "Awareness of CI/CD"
+      ],
+      "5": [
+        "Test driven development",
+        "Sprint planning",
+        "Requirements analysis and breakdown (Stakeholders, Personas, Stories, Journeys, Acceptance Criteria, Interaction Modelling)",
+        "Understanding of CI/CD",
+        "Kanban"
+      ],
+      "6": [
+        "Requirements analysis and breakdown (Stakeholders, Personas, Stories, Journeys, Acceptance Criteria, Interaction Modelling, Sequence/Control Diagrams)",
+        "Development using CI/CD",
+        "Kanban"
+      ]
+    }
+  },
+  {
+    "name": "Git/Version Control",
+    "description": "Managing code changes and collaboration effectively using version control systems.",
+    "levels": {
+      "3": [
+        "Set up individual repository",
+        "Push to repository",
+        "Pull from repository"
+      ],
+      "4": [
+        "Set up repository",
+        "Push to repository",
+        "Pull from repository",
+        "Use branches",
+        "Merge branches",
+        "Markdown Documentation"
+      ],
+      "5": [
+        "Set up repository",
+        "Push to repository",
+        "Pull from repository",
+        "Use branches",
+        "Merge branches",
+        "Make and Handle pull requests",
+        "Rebasing",
+        "Clear markdown documentation"
+      ],
+      "6": [
+        "Set up repository",
+        "Push to repository",
+        "Use tags and releases",
+        "Pull from repository",
+        "Use branches",
+        "Merge branches",
+        "Make and Handle pull requests",
+        "Clear markdown documentation",
+        "Rebasing",
+        "CLI Github",
+        "Github Automation"
+      ]
+    }
+  },
+  {
+    "name": "Linux/Windows CLI",
+    "description": "Proficiency in command-line interfaces for system administration and automation.",
+    "levels": {
+      "3": ["Core basics", "SSH", "Basic File permissions"],
+      "4": [
+        "Core basics",
+        "SSH",
+        "Advanced File permissions",
+        "Man pages",
+        "Writing simple scripts"
+      ],
+      "5": [
+        "Core basics",
+        "SSH",
+        "Advanced File permissions",
+        "Man pages",
+        "Package management",
+        "Services",
+        "Writing advanced scripts"
+      ],
+      "6": [
+        "Core basics",
+        "SSH",
+        "Advanced File permissions",
+        "Man pages",
+        "Package management",
+        "Services",
+        "Writing advanced scripts",
+        "End to end deployment",
+        "Connections"
+      ]
+    }
+  },
+  {
+    "name": "Programming Fundamentals",
+    "description": "Core concepts of software development, architecture, and programming paradigms.",
+    "levels": {
+      "3": [
+        "Awareness of how computer architecture relates to programming",
+        "Understand procedural/imperative Programming",
+        "Implement simple programs"
+      ],
+      "4": [
+        "Awareness of how computer architecture relates to programming",
+        "Understand procedural/imperative and object oriented programming",
+        "Independently implement programs using P/I and OOP",
+        "Understand programming tools (e.g. debugger/static analyser)",
+        "Understand data structures and their applications"
+      ],
+      "5": [
+        "Understand how architecture relates to programming",
+        "Clear understanding of procedural/imperative and OOP",
+        "Implement programs without AI",
+        "Understand programming tools (e.g. debugger / static analyser)",
+        "Understand data structures and their applications",
+        "Program at system level (low level code)",
+        "Parallel processing (Multi-threading)"
+      ],
+      "6": [
+        "Clear understanding of how architecture translates to programming",
+        "Clear understanding of procedural/imperative and OOP",
+        "Implement advanced programs without AI",
+        "Use and understand programming tools (e.g. debugger / static analyser)",
+        "Understand data structures and their applications",
+        "Program at system level (low level code, compiler)",
+        "Understand functional programming"
+      ]
+    }
+  },
+  {
+    "name": "Legal Awareness",
+    "description": "Understanding of computing laws, data protection, and software licensing.",
+    "levels": {
+      "3": ["Awareness of legal responsibilities"],
+      "4": ["Understanding of key legal frameworks such as GDPR"],
+      "5": [
+        "Understand key computing-related legislation (e.g. Computer Misuse Act)",
+        "Awareness of relevant case law, and application in the legal system"
+      ],
+      "6": [
+        "Clear understanding of relevant legal issues",
+        "Ability to apply legal frameworks to projects",
+        "Awareness of contemporary legal issues affecting the computing field",
+        "Awareness of different software licensing models"
+      ]
+    }
+  },
+  {
+    "name": "Cloud Technologies",
+    "description": "Deployment, orchestration, and management of applications in cloud computing environments.",
+    "levels": {
+      "3": [
+        "Awareness of the Cloud",
+        "Some basic understanding of how it works"
+      ],
+      "4": [
+        "Awareness and understanding of cloud architecture",
+        "Instance creation",
+        "Instance SSH",
+        "Compiling and understanding logs",
+        "Running simple programs on the cloud"
+      ],
+      "5": [
+        "Understanding of cloud architecture",
+        "Instance creation",
+        "Instance SSH",
+        "Compiling and understanding logs",
+        "Create and manage instance SSH keys",
+        "Running simple programs on the cloud",
+        "Load balancing and rate limits",
+        "Hosting and Routing services"
+      ],
+      "6": [
+        "Clear understanding of cloud architecture",
+        "Instance creation",
+        "Instance SSH",
+        "Load balancing",
+        "Hosting and Routing services",
+        "Integration",
+        "Running advanced programs (e.g. Map Reduce)",
+        "Serverless compute",
+        "Container orchestration"
+      ]
+    }
+  },
+  {
+    "name": "AI Workflows",
+    "description": "Effective and critical use of artificial intelligence tools in the development process.",
+    "levels": {
+      "3": [
+        "Awareness of AI tools",
+        "Use AI tools as learning assistance (generate questions)"
+      ],
+      "4": [
+        "Awareness of AI tools",
+        "Awareness of the limitations of AI tools",
+        "Evaluate AI output",
+        "Use AI tools as learning assistance (generate questions)",
+        "Use AI tools to generate snippets and decompose them"
+      ],
+      "5": [
+        "Understanding of AI tools",
+        "Understanding of the limitations of AI tools",
+        "Critically evaluate and improve AI output",
+        "Use AI tools as learning assistance (generate questions)",
+        "Use AI tools to generate snippets and decompose them",
+        "Show clear understanding of generated content at a technical level"
+      ],
+      "6": [
+        "Clear understanding of AI tools",
+        "Clear understanding of the limitations of AI tools",
+        "Critically evaluate AI outputs",
+        "Use AI tools as learning assistance (generate questions)",
+        "Use AI tools to generate snippets and decompose them",
+        "Awareness of issues (legal / ethical) of use",
+        "Show clear understanding of generated content at a technical level"
+      ]
+    }
+  },
+  {
+    "name": "Architecture",
+    "description": "Design, evaluation, and implementation of scalable software and system architectures.",
+    "levels": {
+      "3": [
+        "Awareness of common system architecture",
+        "Design architecture for simple systems"
+      ],
+      "4": [
+        "Awareness of system design principles",
+        "Design expandable systems",
+        "Critically evaluate architectural decisions"
+      ],
+      "5": [
+        "Clear understanding of system design principles",
+        "Design clear and expandable systems",
+        "Critically evaluate architectural decisions",
+        "Integrate hardware and software architecture",
+        "Understand and link architecture to program design"
+      ],
+      "6": [
+        "Clear understanding of system design principles",
+        "Design clear, expandable and modular systems",
+        "Critically evaluate architectural decisions",
+        "Integrate multiple hardware and software architectures",
+        "Show consideration of component architecture/limitations in system and program design"
+      ]
+    }
+  },
+  {
+    "name": "Testing + QA",
+    "description": "Application of testing methodologies to ensure software quality and reliability.",
+    "levels": {
+      "3": [
+        "Aware of basic testing principle",
+        "Able to write and use a simple manual test harness"
+      ],
+      "4": [
+        "Incorporating test driven development",
+        "Able to use automated and manual testing",
+        "All key areas tested",
+        "User and Unit tests"
+      ],
+      "5": [
+        "Development and reporting shows evidence of continuous testing",
+        "Automated test harnesses run on code",
+        "Clear analysis of the results of testing",
+        "All key areas tested",
+        "Evidence of testing on some non key areas",
+        "User and Unit tests"
+      ],
+      "6": [
+        "Development and reporting shows evidence of continuous testing",
+        "Automated test harnesses run on code",
+        "Clear analysis of the results of testing",
+        "All areas of code tested",
+        "User and Unit tests"
+      ]
+    }
   }
 ]
