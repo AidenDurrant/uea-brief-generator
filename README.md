@@ -43,6 +43,7 @@ For a new project, run these files in order in **Supabase → SQL Editor**:
 ```text
 supabase/migrations/001_initial_schema.sql
 supabase/migrations/003_admin_user_management.sql
+supabase/migrations/004_admin_role_management.sql
 ```
 
 If the original migration was applied before user profiles were introduced, run `002` before `003`:
@@ -50,6 +51,7 @@ If the original migration was applied before user profiles were introduced, run 
 ```text
 supabase/migrations/002_user_profiles.sql
 supabase/migrations/003_admin_user_management.sql
+supabase/migrations/004_admin_role_management.sql
 ```
 
 The migrations create:
@@ -63,7 +65,7 @@ The migrations create:
 - administrator read access
 - protected administrator statistics and user-management RPCs
 
-Authenticated users may read display names so assessment ownership is understandable. Users may create and update only their own profile. They cannot add themselves to `admin_users`; the promotion RPC explicitly verifies that its caller is already an administrator.
+Authenticated users may read display names so assessment ownership is understandable. Users may create and update only their own profile. They cannot change their own role in `admin_users`; the role-management RPCs explicitly verify that their caller is already an administrator.
 
 ## 4. Configure GitHub OAuth
 
@@ -124,7 +126,7 @@ Administrators can then open:
 /admin
 ```
 
-Regular users see and modify only their own assessments. Administrators can read all assessment data, filter saved-variable statistics, review filtered deadlines in the calendar, see owners' chosen display names, and promote registered users to administrators.
+Regular users see and modify only their own assessments. Administrators can read all assessment data, filter saved-variable statistics, review filtered deadlines in the calendar, see owners' chosen display names, and manage registered users as administrators or standard users.
 
 ## 7. Configure GitHub Pages build values
 
@@ -143,7 +145,7 @@ The existing `.github/workflows/deploy.yml` passes these values into the static 
 - **Save New** inserts an assessment into Supabase.
 - **Update** updates the selected assessment.
 - The builder sidebar lists only the signed-in user's assessments.
-- Administrators access filtered statistics, assessment records, deadline calendars, and user promotion controls through `/admin`.
+- Administrators access filtered statistics, assessment records, deadline calendars, and user role controls through `/admin`.
 - Uploaded images are currently stored inside the assessment JSON as data URLs. Move these to private object storage before production.
 
 ## Validation
@@ -159,7 +161,7 @@ The static export generates both `/` and `/admin` for GitHub Pages.
 - Do not disable RLS.
 - Do not expose the service-role key.
 - Do not put the GitHub OAuth secret in the frontend or repository.
-- Bootstrap the first administrator through trusted Supabase SQL; subsequent promotions use the protected admin-only RPC in the dashboard.
-- Administrator promotion is intentionally one-way in the prototype UI. Remove access only through a trusted Supabase SQL/admin process.
+- Bootstrap the first administrator through trusted Supabase SQL; subsequent role changes use protected admin-only RPCs in the dashboard.
+- Administrators cannot demote themselves or remove the final administrator through the dashboard.
 - Use synthetic data during the trial.
 - Obtain institutional approval before storing live assessment information.

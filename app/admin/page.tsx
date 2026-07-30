@@ -288,7 +288,9 @@ export default function AdminDashboard() {
   const [currentProfileName, setCurrentProfileName] = useState("");
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
+  const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(
+    null,
+  );
 
   const [search, setSearch] = useState("");
   const [academicYear, setAcademicYear] = useState(ALL);
@@ -556,21 +558,44 @@ export default function AdminDashboard() {
     setDeadlineWindow(ALL);
   };
 
-  const promoteUser = async (target: AdminDirectoryUser) => {
-    if (!supabase || target.is_admin) return;
-    setPromotingUserId(target.user_id);
+  const updateUserRole = async (
+    target: AdminDirectoryUser,
+    makeAdministrator: boolean,
+  ) => {
+    if (!supabase || target.is_admin === makeAdministrator) return;
+    if (!makeAdministrator && target.user_id === user?.id) {
+      setError("You cannot demote your own administrator account.");
+      return;
+    }
+    if (
+      !makeAdministrator &&
+      !window.confirm(
+        `Change ${target.display_name} to a standard user? They will immediately lose administrator access.`,
+      )
+    ) {
+      return;
+    }
+
+    setChangingRoleUserId(target.user_id);
     setError(null);
-    const { error: promotionError } = await supabase.rpc("admin_promote_user", {
-      target_user_id: target.user_id,
-    });
-    setPromotingUserId(null);
-    if (promotionError) {
-      setError(promotionError.message);
+    const result = makeAdministrator
+      ? await supabase.rpc("admin_promote_user", {
+          target_user_id: target.user_id,
+        })
+      : await supabase.rpc("admin_demote_user", {
+          target_user_id: target.user_id,
+        });
+    setChangingRoleUserId(null);
+
+    if (result.error) {
+      setError(result.error.message);
       return;
     }
     setDirectoryUsers((current) =>
       current.map((item) =>
-        item.user_id === target.user_id ? { ...item, is_admin: true } : item,
+        item.user_id === target.user_id
+          ? { ...item, is_admin: makeAdministrator }
+          : item,
       ),
     );
   };
@@ -822,66 +847,6 @@ export default function AdminDashboard() {
         </section>
 
         <section className="panel overflow-hidden">
-          <div className="border-b border-slate-200 p-5 sm:p-6">
-            <p className="eyebrow">Saved-variable analytics</p>
-            <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Statistics explorer
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                  Inspect completion and value distributions for every saved
-                  top-level and brief-content variable. Long narrative responses
-                  are grouped as completed to keep statistics meaningful.
-                </p>
-              </div>
-              <label className="filter-label w-full sm:w-80">
-                Variable
-                <select
-                  value={resolvedSelectedVariable}
-                  onChange={(event) => setSelectedVariable(event.target.value)}
-                  className="filter-control"
-                >
-                  {fieldSummaries.map((field) => (
-                    <option key={field.key} value={field.key}>
-                      {field.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-          {activeSummary ? (
-            <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.38fr)]">
-              <DistributionChart summary={activeSummary} />
-              <div className="grid content-start gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                <MiniStat
-                  label="Assessments with value"
-                  value={`${activeSummary.completed} / ${filtered.length}`}
-                />
-                <MiniStat
-                  label="Completion"
-                  value={percentage(activeSummary.completed, filtered.length)}
-                />
-                <MiniStat
-                  label="Distinct responses"
-                  value={activeSummary.values.length.toLocaleString()}
-                />
-              </div>
-            </div>
-          ) : (
-            <EmptyState message="No saved variables are available for the current filters." />
-          )}
-        </section>
-
-        <CalendarPanel
-          month={calendarMonth}
-          deadlines={deadlines}
-          profileNames={profileNames}
-          onMonthChange={setCalendarMonth}
-        />
-
-        <section className="panel overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
             <p className="eyebrow">Filtered records</p>
             <h2 className="mt-1 font-semibold">Assessments</h2>
@@ -971,14 +936,74 @@ export default function AdminDashboard() {
 
         <section className="panel overflow-hidden">
           <div className="border-b border-slate-200 p-5 sm:p-6">
+            <p className="eyebrow">Saved-variable analytics</p>
+            <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Statistics explorer
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                  Inspect completion and value distributions for every saved
+                  top-level and brief-content variable. Long narrative responses
+                  are grouped as completed to keep statistics meaningful.
+                </p>
+              </div>
+              <label className="filter-label w-full sm:w-80">
+                Variable
+                <select
+                  value={resolvedSelectedVariable}
+                  onChange={(event) => setSelectedVariable(event.target.value)}
+                  className="filter-control"
+                >
+                  {fieldSummaries.map((field) => (
+                    <option key={field.key} value={field.key}>
+                      {field.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+          {activeSummary ? (
+            <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.38fr)]">
+              <DistributionChart summary={activeSummary} />
+              <div className="grid content-start gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <MiniStat
+                  label="Assessments with value"
+                  value={`${activeSummary.completed} / ${filtered.length}`}
+                />
+                <MiniStat
+                  label="Completion"
+                  value={percentage(activeSummary.completed, filtered.length)}
+                />
+                <MiniStat
+                  label="Distinct responses"
+                  value={activeSummary.values.length.toLocaleString()}
+                />
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No saved variables are available for the current filters." />
+          )}
+        </section>
+
+        <CalendarPanel
+          month={calendarMonth}
+          deadlines={deadlines}
+          profileNames={profileNames}
+          onMonthChange={setCalendarMonth}
+        />
+
+        <section className="panel overflow-hidden">
+          <div className="border-b border-slate-200 p-5 sm:p-6">
             <p className="eyebrow">Access management</p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">
               Administrators
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Promote a registered user after verifying their identity.
-              Promotion grants oversight of all saved assessment information and
-              cannot be reversed from this prototype interface.
+              Assign registered users as administrators or standard users.
+              Administrators can view all saved assessment information, so
+              verify each user before changing their access.
             </p>
           </div>
           <div className="grid divide-y divide-slate-100">
@@ -1002,22 +1027,51 @@ export default function AdminDashboard() {
                     {directoryUser.user_id}
                   </p>
                 </div>
-                {directoryUser.is_admin ? (
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    Administrator
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => void promoteUser(directoryUser)}
-                    disabled={promotingUserId !== null}
-                    className="button-secondary disabled:cursor-wait disabled:opacity-50"
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      directoryUser.is_admin
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
                   >
-                    {promotingUserId === directoryUser.user_id
-                      ? "Promoting…"
-                      : "Make administrator"}
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        directoryUser.is_admin
+                          ? "bg-emerald-500"
+                          : "bg-slate-400"
+                      }`}
+                    />
+                    {directoryUser.is_admin ? "Administrator" : "Standard user"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void updateUserRole(
+                        directoryUser,
+                        !directoryUser.is_admin,
+                      )
+                    }
+                    disabled={
+                      changingRoleUserId !== null ||
+                      directoryUser.user_id === user?.id
+                    }
+                    title={
+                      directoryUser.user_id === user?.id
+                        ? "You cannot change your own administrator role"
+                        : undefined
+                    }
+                    className="button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {changingRoleUserId === directoryUser.user_id
+                      ? "Updating role…"
+                      : directoryUser.user_id === user?.id
+                        ? "Current account"
+                        : directoryUser.is_admin
+                          ? "Make standard user"
+                          : "Make administrator"}
                   </button>
-                )}
+                </div>
               </div>
             ))}
             {directoryUsers.length === 0 && (

@@ -697,14 +697,56 @@ export default function BriefGenerator() {
     const academicYear = ACADEMIC_YEAR_OPTIONS.includes(selectedAcademicYear)
       ? selectedAcademicYear
       : "Unspecified";
+    const persistedFormData: Record<string, unknown> = { ...formData };
+
+    if (formData.groupWorkPermitted !== "Yes") {
+      persistedFormData.groupSize = null;
+      persistedFormData.groupMechanics = null;
+    }
+
+    Object.entries(sectionToggles).forEach(([sectionId, isVisible]) => {
+      if (!isVisible && sectionId !== "gradingMatrix") {
+        persistedFormData[sectionId] = null;
+      }
+    });
+
+    if (formData.assessmentType !== "Other") {
+      persistedFormData.customAssessmentName = null;
+      persistedFormData.customAssessmentDesc = null;
+    }
+
+    if (formData.aiPolicy !== "AMBER") {
+      persistedFormData.aiAmberPermitted = null;
+      persistedFormData.aiAmberProhibited = null;
+    }
+    if (formData.aiPolicy !== "GREEN") {
+      persistedFormData.aiGreenPermitted = null;
+    }
+
+    const cleanEmptyValues = (value: unknown): unknown => {
+      if (typeof value === "string") return value.trim() ? value : null;
+      if (Array.isArray(value)) return value.map(cleanEmptyValues);
+      if (typeof value === "object" && value !== null) {
+        return Object.fromEntries(
+          Object.entries(value).map(([key, nested]) => [
+            key,
+            cleanEmptyValues(nested),
+          ]),
+        );
+      }
+      return value;
+    };
+
     const content = JSON.parse(
-      JSON.stringify({
-        formData,
-        sectionToggles,
-        selectedSkills,
-        rubricRows,
-        uploadedImages,
-      }),
+      JSON.stringify(
+        cleanEmptyValues({
+          formData: persistedFormData,
+          sectionToggles,
+          selectedSkills: selectedSkills.length > 0 ? selectedSkills : null,
+          rubricRows: sectionToggles.gradingMatrix ? rubricRows : null,
+          uploadedImages,
+        }),
+      ),
     ) as Json;
 
     const record = {
