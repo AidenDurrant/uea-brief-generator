@@ -6,10 +6,20 @@ import rehypeKatex from "rehype-katex";
 import SKILLS_LIST from "./skills.json";
 import ASSESSMENT_METHODS from "./assessments.json";
 import TEMPLATE from "./template.json";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import type { Assessment, Json } from "@/lib/database.types";
+import type { User } from "@supabase/supabase-js";
 
 // ─── Constants & Extracted Text ───────────────────────────────────────────────
 const DRAFT_STORAGE_KEY = "uea_brief_draft_v2";
-const DB_STORAGE_KEY = "uea_briefs_db";
+
+type SavedBriefContent = {
+  formData?: Record<string, unknown>;
+  sectionToggles?: Record<string, boolean>;
+  selectedSkills?: string[];
+  rubricRows?: Record<string, unknown>[];
+  uploadedImages?: Record<string, string>;
+};
 
 const DEFAULT_STATIC_CONTENT = {
   academicIntegrity: {
@@ -322,9 +332,19 @@ export default function BriefGenerator() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Database / API States
-  const [briefsList, setBriefsList] = useState<any[]>([]);
+  // Supabase authentication and persistence state
+  const [briefsList, setBriefsList] = useState<Assessment[]>([]);
   const [currentBriefId, setCurrentBriefId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [profileName, setProfileName] = useState("");
+  const [pendingDisplayName, setPendingDisplayName] = useState("");
+  const [isProfileRequired, setIsProfileRequired] = useState(false);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(isSupabaseConfigured);
+  const [isBriefsLoading, setIsBriefsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
 
   // Form States
   const [formData, setFormData] = useState<Record<string, any>>(
@@ -342,19 +362,71 @@ export default function BriefGenerator() {
   );
   const [rubricRows, setRubricRows] = useState<any[]>(defaults.rubricRows);
 
-  // Load Data safely
+  const refreshBriefs = useCallback(async (ownerId: string) => {
+    if (!supabase) return;
+    setIsBriefsLoading(true);
+    setPersistenceError(null);
+
+    const { data, error } = await supabase
+      .from("assessments")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      setPersistenceError(error.message);
+      setBriefsList([]);
+    } else {
+      setBriefsList(data ?? []);
+    }
+    setIsBriefsLoading(false);
+  }, []);
+
+  const refreshAdminStatus = useCallback(async (userId: string) => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    setIsAdmin(Boolean(data));
+  }, []);
+
+  const refreshProfile = useCallback(async (user: User) => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      setPersistenceError(error.message);
+      return;
+    }
+
+    if (data?.display_name) {
+      setProfileName(data.display_name);
+      setPendingDisplayName(data.display_name);
+      setIsProfileRequired(false);
+      return;
+    }
+
+    const suggestedName = String(
+      user.user_metadata.full_name ||
+        user.user_metadata.name ||
+        user.user_metadata.user_name ||
+        "",
+    );
+    setProfileName("");
+    setPendingDisplayName(suggestedName);
+    setIsProfileRequired(true);
+  }, []);
+
+  // Load the local draft and initialise the Supabase auth session.
   useEffect(() => {
     setIsClient(true);
 
-    // Load Mock DB
-    try {
-      const db = JSON.parse(localStorage.getItem(DB_STORAGE_KEY) || "[]");
-      setBriefsList(Array.isArray(db) ? db : []);
-    } catch (e) {
-      setBriefsList([]);
-    }
-
-    // Load Draft
     const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (savedDraft) {
       try {
@@ -374,7 +446,54 @@ export default function BriefGenerator() {
         console.error("Failed to parse draft:", error);
       }
     }
-  }, []);
+
+    const client = supabase;
+    if (!client) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    const syncSession = async () => {
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      const user = session?.user ?? null;
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+      if (user) {
+        await Promise.all([
+          refreshBriefs(user.id),
+          refreshAdminStatus(user.id),
+          refreshProfile(user),
+        ]);
+      }
+    };
+    void syncSession();
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user ?? null;
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+      if (user) {
+        window.setTimeout(() => {
+          void refreshBriefs(user.id);
+          void refreshAdminStatus(user.id);
+          void refreshProfile(user);
+        }, 0);
+      } else {
+        setBriefsList([]);
+        setCurrentBriefId(null);
+        setProfileName("");
+        setPendingDisplayName("");
+        setIsProfileRequired(false);
+        setIsAdmin(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [refreshAdminStatus, refreshBriefs, refreshProfile]);
 
   // Auto-save draft
   useEffect(() => {
@@ -440,69 +559,151 @@ export default function BriefGenerator() {
       setIsSidebarOpen(false);
   };
 
-  const handleLoadBrief = (briefId: string) => {
-    const brief = briefsList.find((b) => b.id === briefId);
-    if (!brief) return;
+  const handleGitHubSignIn = async () => {
+    if (!supabase) return;
+    setPersistenceError(null);
+    const redirectTo = window.location.href.split(/[?#]/)[0];
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: { redirectTo },
+    });
+    if (error) setPersistenceError(error.message);
+  };
 
-    setFormData({ ...defaults.formData, ...(brief.formData || {}) });
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    loadDefault();
+  };
+
+  const handleSaveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase || !currentUser) return;
+
+    const displayName = pendingDisplayName.trim();
+    if (displayName.length < 2 || displayName.length > 100) {
+      setPersistenceError("Enter a display name between 2 and 100 characters.");
+      return;
+    }
+
+    setIsProfileSaving(true);
+    setPersistenceError(null);
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(
+        { user_id: currentUser.id, display_name: displayName },
+        { onConflict: "user_id" },
+      );
+    setIsProfileSaving(false);
+
+    if (error) {
+      setPersistenceError(error.message);
+      return;
+    }
+
+    setProfileName(displayName);
+    setIsProfileRequired(false);
+  };
+
+  const handleLoadBrief = (briefId: string) => {
+    const brief = briefsList.find((item) => item.id === briefId);
+    if (!brief) return;
+    const content = brief.content as unknown as SavedBriefContent;
+
+    setFormData({ ...defaults.formData, ...(content.formData || {}) });
     setSectionToggles({
       ...defaults.sectionToggles,
-      ...(brief.sectionToggles || {}),
+      ...(content.sectionToggles || {}),
     });
-    setSelectedSkills(brief.selectedSkills || defaults.selectedSkills);
+    setSelectedSkills(content.selectedSkills || defaults.selectedSkills);
     setExpandedSkills([]);
     setRubricRows(
-      brief.rubricRows?.length ? brief.rubricRows : defaults.rubricRows,
+      content.rubricRows?.length ? content.rubricRows : defaults.rubricRows,
     );
-    setUploadedImages(brief.uploadedImages || defaults.uploadedImages);
+    setUploadedImages(content.uploadedImages || defaults.uploadedImages);
     setCurrentBriefId(brief.id);
-    if (typeof window !== "undefined" && window.innerWidth < 768)
-      setIsSidebarOpen(false);
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
-  const handleDeleteBrief = (e: React.MouseEvent, briefId: string) => {
-    e.stopPropagation();
-    if (window.confirm("Delete this saved brief forever?")) {
-      const updatedList = briefsList.filter((b) => b.id !== briefId);
-      setBriefsList(updatedList);
-      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(updatedList));
-      if (currentBriefId === briefId) loadDefault();
+  const handleDeleteBrief = async (
+    event: React.MouseEvent,
+    briefId: string,
+  ) => {
+    event.stopPropagation();
+    if (!supabase || !window.confirm("Delete this saved brief forever?"))
+      return;
+
+    const { error } = await supabase
+      .from("assessments")
+      .delete()
+      .eq("id", briefId);
+
+    if (error) {
+      setPersistenceError(error.message);
+      return;
     }
+
+    setBriefsList((current) => current.filter((brief) => brief.id !== briefId));
+    if (currentBriefId === briefId) loadDefault();
   };
 
-  const handleSaveToDatabase = () => {
-    const title = formData.module || "Untitled Assessment";
-    const payload = {
-      formData,
-      sectionToggles,
-      selectedSkills,
-      rubricRows,
-      uploadedImages,
-      aiPolicy: formData.aiPolicy,
-      assessmentType: formData.assessmentType,
+  const handleSaveToDatabase = async () => {
+    if (!supabase || !currentUser) {
+      setPersistenceError("Sign in with GitHub to save assessments.");
+      return;
+    }
+
+    setIsSaving(true);
+    setPersistenceError(null);
+
+    const title = String(formData.module || "Untitled Assessment");
+    const moduleCode = title.split(/\s+/)[0] || "Unspecified";
+    const programme = String(formData.programme || "");
+    const academicYear =
+      programme.match(/20\d{2}\s*[-/]\s*20\d{2}/)?.[0].replace(/\s/g, "") ||
+      "Unspecified";
+    const content = JSON.parse(
+      JSON.stringify({
+        formData,
+        sectionToggles,
+        selectedSkills,
+        rubricRows,
+        uploadedImages,
+      }),
+    ) as Json;
+
+    const record = {
+      title,
+      module_code: moduleCode,
+      academic_year: academicYear,
+      assessment_type: String(formData.assessmentType || "Unspecified"),
+      ai_policy: String(formData.aiPolicy || "Unspecified"),
+      group_work_permitted: formData.groupWorkPermitted === "Yes",
+      status: String(formData.status || "draft"),
+      content,
     };
 
-    let updatedList = [...briefsList];
-    let newId = currentBriefId;
+    const existingId =
+      currentBriefId && briefsList.some((brief) => brief.id === currentBriefId)
+        ? currentBriefId
+        : null;
 
-    if (newId) {
-      updatedList = updatedList.map((b) =>
-        b.id === newId ? { ...b, title, updated: Date.now(), ...payload } : b,
-      );
-    } else {
-      newId = Date.now().toString();
-      updatedList.unshift({
-        id: newId,
-        title,
-        updated: Date.now(),
-        ...payload,
-      });
+    const query = existingId
+      ? supabase.from("assessments").update(record).eq("id", existingId)
+      : supabase
+          .from("assessments")
+          .insert({ ...record, owner_id: currentUser.id });
+
+    const { data, error } = await query.select("*").single();
+    setIsSaving(false);
+
+    if (error) {
+      setPersistenceError(error.message);
+      return;
     }
 
-    setBriefsList(updatedList);
-    setCurrentBriefId(newId);
-    localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(updatedList));
-    alert("Brief saved successfully to local database!");
+    setCurrentBriefId(data.id);
+    await refreshBriefs(currentUser.id);
   };
 
   const handleClearDraft = () => {
@@ -653,6 +854,61 @@ export default function BriefGenerator() {
 
   return (
     <div className="app-shell flex h-screen w-full overflow-hidden font-sans bg-slate-900 print:block print:h-auto print:overflow-visible print:bg-white">
+      {currentUser && isProfileRequired && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-5 backdrop-blur-sm print:hidden">
+          <form
+            onSubmit={handleSaveProfile}
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl"
+          >
+            <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-slate-900 text-white">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 .7a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.02c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.57-.3-5.27-1.29-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.75 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.75.12 3.04.74.81 1.18 1.83 1.18 3.09 0 4.4-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+              </svg>
+            </div>
+            <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
+              Welcome to the assessment builder
+            </h2>
+            <p className="mt-3 text-center text-sm leading-6 text-slate-500">
+              Choose the name colleagues and administrators will see alongside
+              your assessments.
+            </p>
+            <label className="mt-6 block text-sm font-semibold text-slate-700">
+              Display name
+              <input
+                autoFocus
+                required
+                minLength={2}
+                maxLength={100}
+                value={pendingDisplayName}
+                onChange={(event) => setPendingDisplayName(event.target.value)}
+                placeholder="e.g. Alex Morgan"
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={isProfileSaving}
+              className="mt-5 w-full rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isProfileSaving ? "Saving…" : "Continue"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="mt-3 w-full rounded-full px-5 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* ═══════════════════════════════════════════════════════════
           SIDEBAR — Database Form Manager
       ═══════════════════════════════════════════════════════════ */}
@@ -700,8 +956,37 @@ export default function BriefGenerator() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            {briefsList.length === 0 && (
-              <div className="text-xs text-slate-500 text-center p-6 border border-dashed border-slate-700/50 rounded-lg mt-2">
+            {!isSupabaseConfigured && (
+              <div className="text-xs text-amber-300/80 text-center p-5 border border-dashed border-amber-500/30 rounded-xl mt-2">
+                Add the Supabase environment variables to enable shared storage.
+              </div>
+            )}
+            {isSupabaseConfigured && isAuthLoading && (
+              <div className="text-xs text-slate-500 text-center p-6">
+                Checking your session…
+              </div>
+            )}
+            {isSupabaseConfigured && !isAuthLoading && !currentUser && (
+              <div className="text-xs text-slate-400 text-center p-5 border border-dashed border-slate-700 rounded-xl mt-2">
+                <p className="mb-3">
+                  Sign in with GitHub to access saved briefs.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGitHubSignIn}
+                  className="px-4 py-2 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-500"
+                >
+                  Sign in with GitHub
+                </button>
+              </div>
+            )}
+            {currentUser && isBriefsLoading && (
+              <div className="text-xs text-slate-500 text-center p-6">
+                Loading assessments…
+              </div>
+            )}
+            {currentUser && !isBriefsLoading && briefsList.length === 0 && (
+              <div className="text-xs text-slate-500 text-center p-6 border border-dashed border-slate-700/50 rounded-xl mt-2">
                 No saved briefs yet. <br /> Click + New to start.
               </div>
             )}
@@ -722,7 +1007,7 @@ export default function BriefGenerator() {
                   <div
                     className={`text-[10px] mt-0.5 font-medium ${currentBriefId === brief.id ? "text-indigo-200" : "text-slate-500"}`}
                   >
-                    {new Date(brief.updated).toLocaleDateString()}
+                    {new Date(brief.updated_at).toLocaleDateString()}
                   </div>
                 </div>
                 <button
@@ -750,6 +1035,31 @@ export default function BriefGenerator() {
               </div>
             ))}
           </div>
+
+          {currentUser && (
+            <div className="p-4 border-t border-slate-800 text-xs">
+              <div className="truncate text-slate-300 font-medium">
+                {profileName || currentUser.email || "Signed-in GitHub user"}
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                {isAdmin && (
+                  <a
+                    href="./admin/"
+                    className="text-indigo-400 hover:text-indigo-300 font-semibold"
+                  >
+                    Admin dashboard
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="text-slate-500 hover:text-white"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -829,6 +1139,38 @@ export default function BriefGenerator() {
             </div>
 
             <div className="flex items-center gap-2">
+              {!isSupabaseConfigured && (
+                <span className="hidden 2xl:inline text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+                  Supabase setup required
+                </span>
+              )}
+              {isSupabaseConfigured && !isAuthLoading && !currentUser && (
+                <button
+                  type="button"
+                  onClick={handleGitHubSignIn}
+                  className="toolbar-action toolbar-action-muted flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                >
+                  GitHub sign in
+                </button>
+              )}
+              {currentUser && isAdmin && (
+                <a
+                  href="./admin/"
+                  className="toolbar-action hidden 2xl:flex items-center px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Admin
+                </a>
+              )}
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="toolbar-action hidden 2xl:flex items-center px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                  title={currentUser.email}
+                >
+                  Sign out
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleClearDraft}
@@ -863,7 +1205,8 @@ export default function BriefGenerator() {
               <button
                 type="button"
                 onClick={handleSaveToDatabase}
-                className="toolbar-action toolbar-action-primary flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white transition-colors active:scale-95"
+                disabled={isSaving}
+                className="toolbar-action toolbar-action-primary flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white transition-colors active:scale-95 disabled:opacity-60 disabled:cursor-wait"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -881,10 +1224,23 @@ export default function BriefGenerator() {
                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                   />
                 </svg>
-                {currentBriefId ? "Update" : "Save New"}
+                {isSaving ? "Saving…" : currentBriefId ? "Update" : "Save New"}
               </button>
             </div>
           </header>
+
+          {persistenceError && (
+            <div className="px-5 py-2.5 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between gap-4">
+              <span>{persistenceError}</span>
+              <button
+                type="button"
+                onClick={() => setPersistenceError(null)}
+                className="font-bold"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           <div className="editor-content flex-1 overflow-y-auto space-y-6">
             {/* 1 — Header Details */}
