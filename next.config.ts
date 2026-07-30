@@ -14,7 +14,7 @@ const basePath =
 const nextConfig: NextConfig = {
   output: "export",
   basePath,
-  trailingSlash: true,
+  trailingSlash: false,
 
   // GitHub Pages has no Next.js image optimisation server.
   images: {

@@ -125,6 +125,8 @@ const AI_OPTIONS = [
   { value: "GREEN", emoji: "🟢", label: "GREEN", desc: "Full Integration" },
 ];
 
+const ACADEMIC_YEAR_OPTIONS = ["2025-2026", "2026-2027", "2027-2028"];
+
 // ─── Helper Formatting Functions ──────────────────────────────────────────────
 
 const formatDateOnly = (dateString: string) => {
@@ -150,6 +152,37 @@ const formatDateTime = (dateString?: string, description?: string) => {
     minute: "2-digit",
   });
   return description ? `${formattedDate} (${description})` : formattedDate;
+};
+
+const normaliseLoadedFormData = (
+  saved: unknown,
+  defaults: Record<string, unknown>,
+) => {
+  const source =
+    typeof saved === "object" && saved !== null
+      ? (saved as Record<string, unknown>)
+      : {};
+  const merged = { ...defaults, ...source };
+
+  if (!Object.prototype.hasOwnProperty.call(source, "academicYear")) {
+    const legacyProgramme = String(source.programme || "");
+    const legacyYear = legacyProgramme
+      .match(/20\d{2}\s*[-/]\s*20\d{2}/)?.[0]
+      .replace(/\s/g, "")
+      .replace("/", "-");
+
+    if (legacyYear && ACADEMIC_YEAR_OPTIONS.includes(legacyYear)) {
+      merged.academicYear = legacyYear;
+    }
+    if (legacyYear) {
+      merged.programme = legacyProgramme
+        .replace(/20\d{2}\s*[-/]\s*20\d{2}/, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+  }
+
+  return merged;
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -327,8 +360,8 @@ export default function BriefGenerator() {
   const defaults = getDefaultState();
   const [isClient, setIsClient] = useState(false);
 
-  const [zoom, setZoom] = useState(80);
-  const [panelWidth, setPanelWidth] = useState(46);
+  const [zoom, setZoom] = useState(60);
+  const [panelWidth, setPanelWidth] = useState(66.67);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -431,7 +464,9 @@ export default function BriefGenerator() {
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
-        setFormData({ ...defaults.formData, ...(parsed.formData || {}) });
+        setFormData(
+          normaliseLoadedFormData(parsed.formData, defaults.formData),
+        );
         setSectionToggles({
           ...defaults.sectionToggles,
           ...(parsed.sectionToggles || {}),
@@ -610,7 +645,7 @@ export default function BriefGenerator() {
     if (!brief) return;
     const content = brief.content as unknown as SavedBriefContent;
 
-    setFormData({ ...defaults.formData, ...(content.formData || {}) });
+    setFormData(normaliseLoadedFormData(content.formData, defaults.formData));
     setSectionToggles({
       ...defaults.sectionToggles,
       ...(content.sectionToggles || {}),
@@ -658,10 +693,10 @@ export default function BriefGenerator() {
 
     const title = String(formData.module || "Untitled Assessment");
     const moduleCode = title.split(/\s+/)[0] || "Unspecified";
-    const programme = String(formData.programme || "");
-    const academicYear =
-      programme.match(/20\d{2}\s*[-/]\s*20\d{2}/)?.[0].replace(/\s/g, "") ||
-      "Unspecified";
+    const selectedAcademicYear = String(formData.academicYear || "");
+    const academicYear = ACADEMIC_YEAR_OPTIONS.includes(selectedAcademicYear)
+      ? selectedAcademicYear
+      : "Unspecified";
     const content = JSON.parse(
       JSON.stringify({
         formData,
@@ -1037,28 +1072,45 @@ export default function BriefGenerator() {
           </div>
 
           {currentUser && (
-            <div className="p-4 border-t border-slate-800 text-xs">
-              <div className="truncate text-slate-300 font-medium">
-                {profileName || currentUser.email || "Signed-in GitHub user"}
+            <section className="border-t border-slate-800 bg-slate-950/60 p-4">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                Account
+              </p>
+              <div className="mb-3 flex min-w-0 items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-500/15 text-sm font-bold text-indigo-300">
+                  {(profileName || currentUser.email || "U")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">
+                    {profileName || "GitHub user"}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {currentUser.email || "Authenticated with GitHub"}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 mt-2">
+              <div className="grid gap-2">
                 {isAdmin && (
                   <a
-                    href="./admin/"
-                    className="text-indigo-400 hover:text-indigo-300 font-semibold"
+                    href="./admin"
+                    className="flex items-center justify-between rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 py-2.5 text-xs font-semibold text-indigo-300 hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:text-white"
                   >
-                    Admin dashboard
+                    <span>Administration dashboard</span>
+                    <span aria-hidden="true">→</span>
                   </a>
                 )}
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="text-slate-500 hover:text-white"
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-800 px-3 py-2.5 text-left text-xs font-semibold text-slate-400 hover:border-slate-700 hover:bg-slate-800 hover:text-white"
                 >
-                  Sign out
+                  <span>Sign out</span>
+                  <span aria-hidden="true">↗</span>
                 </button>
               </div>
-            </div>
+            </section>
           )}
         </div>
       </div>
@@ -1075,7 +1127,7 @@ export default function BriefGenerator() {
           style={{ width: `${panelWidth}%`, minWidth: 300 }}
         >
           <header
-            className="editor-toolbar shrink-0 flex items-center justify-between z-20"
+            className="editor-toolbar shrink-0 flex flex-wrap items-center justify-between gap-3 z-20"
             style={{
               background: "#fff",
               borderBottom: "1px solid #e8eaed",
@@ -1085,7 +1137,7 @@ export default function BriefGenerator() {
               paddingBottom: 14,
             }}
           >
-            <div className="flex items-center gap-3">
+            <div className="editor-toolbar-brand flex items-center gap-3">
               {/* Hamburger Menu Toggle */}
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -1110,18 +1162,7 @@ export default function BriefGenerator() {
                 </svg>
               </button>
 
-              <img
-                src="./UEA_Logo_BLK_MONO_N_A_59244.png"
-                alt="UEA"
-                className="editor-logo"
-                style={{
-                  width: 150,
-                  height: 36,
-                  objectFit: "contain",
-                  objectPosition: "left center",
-                }}
-              />
-              <div className="hidden xl:block ml-2">
+              <div>
                 <h1
                   style={{
                     color: "#111827",
@@ -1138,7 +1179,7 @@ export default function BriefGenerator() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="editor-toolbar-actions ml-auto flex min-w-[220px] flex-1 flex-wrap items-center justify-end gap-2">
               {!isSupabaseConfigured && (
                 <span className="hidden 2xl:inline text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
                   Supabase setup required
@@ -1153,28 +1194,11 @@ export default function BriefGenerator() {
                   GitHub sign in
                 </button>
               )}
-              {currentUser && isAdmin && (
-                <a
-                  href="./admin/"
-                  className="toolbar-action hidden 2xl:flex items-center px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                >
-                  Admin
-                </a>
-              )}
-              {currentUser && (
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="toolbar-action hidden 2xl:flex items-center px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"
-                  title={currentUser.email}
-                >
-                  Sign out
-                </button>
-              )}
+
               <button
                 type="button"
                 onClick={handleClearDraft}
-                className="toolbar-action toolbar-action-muted hidden xl:flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-500 transition-colors active:scale-95"
+                className="toolbar-action toolbar-action-muted flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-500 transition-colors active:scale-95"
               >
                 Clear Draft
               </button>
@@ -1289,6 +1313,20 @@ export default function BriefGenerator() {
                           %
                         </span>
                       </div>
+                    ) : field.id === "academicYear" ? (
+                      <select
+                        className={INPUT}
+                        value={formData.academicYear || ""}
+                        onChange={(e) =>
+                          handleChange("academicYear", e.target.value)
+                        }
+                      >
+                        {ACADEMIC_YEAR_OPTIONS.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <input
                         type={field.type || "text"}
@@ -2196,7 +2234,7 @@ export default function BriefGenerator() {
               <div className="w-px h-4 bg-slate-700 mx-1" />
               <button
                 type="button"
-                onClick={() => setZoom(80)}
+                onClick={() => setZoom(60)}
                 className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-white hover:bg-white/10 rounded-md transition-all duration-150"
               >
                 Reset
@@ -2207,338 +2245,354 @@ export default function BriefGenerator() {
           {/* Document canvas */}
           <div className="flex-1 overflow-auto bg-slate-700 p-10 flex justify-center items-start print:p-0 print:block print:h-auto print:overflow-visible print:bg-white print:m-0">
             <div
-              className="pdf-page corporate-document box-border mx-auto bg-white text-black shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
-              style={{ zoom: zoom / 100 }}
+              className="pdf-preview-stage mx-auto shrink-0"
+              style={{
+                width: `${(210 * zoom) / 100}mm`,
+                minHeight: `${(297 * zoom) / 100}mm`,
+              }}
             >
-              {/* PDF Header */}
-              <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
-                <img
-                  src="./UEA_Logo_BLK_MONO_N_A_59244.png"
-                  alt="University of East Anglia"
-                  className="corporate-document-logo"
-                />
-                <h1 className="text-3xl font-bold uppercase tracking-widest">
-                  {TEMPLATE.documentTitles?.institution ||
-                    "University of East Anglia"}
-                </h1>
-                <h2 className="text-[1.2rem] font-semibold mt-2">
-                  {formData.school}
-                </h2>
-                <h3 className="text-[1.1rem] mt-2 text-gray-700 italic">
-                  {formData.programme}
-                </h3>
-              </div>
+              <div
+                className="pdf-page corporate-document box-border bg-white text-black shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
+                style={{
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                {/* PDF Header */}
+                <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
+                  <img
+                    src="./UEA_Logo_BLK_MONO_N_A_59244.png"
+                    alt="University of East Anglia"
+                    className="corporate-document-logo"
+                  />
+                  <h1 className="text-3xl font-bold uppercase tracking-widest">
+                    {TEMPLATE.documentTitles?.institution ||
+                      "University of East Anglia"}
+                  </h1>
+                  <h2 className="text-[1.2rem] font-semibold mt-2">
+                    {formData.school}
+                  </h2>
+                  <h3 className="text-[1.1rem] mt-2 text-gray-700 italic">
+                    {formData.programme}
+                  </h3>
+                </div>
 
-              {/* Details table (Dynamically mapped from JSON) */}
-              <table className="corporate-meta-table w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
-                <tbody>
-                  {TEMPLATE.headerFields
-                    .filter((f) => f.id !== "school" && f.id !== "programme")
-                    .map((field, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-black print:break-inside-avoid"
-                      >
-                        <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                          {field.label}
-                        </th>
-                        <td className="py-2.5 px-4">
-                          {field.type === "date"
-                            ? formatDateOnly(formData[field.id] as string)
-                            : (formData[field.id] as string)}
-                        </td>
-                      </tr>
-                    ))}
-                  <tr className="border-b border-black print:break-inside-avoid">
-                    <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                      Submission / Exam Date(s)
-                    </th>
-                    <td className="py-2.5 px-4">
-                      {formData.submissionDates?.map((d: any, idx: number) => (
-                        <div key={idx} className={idx > 0 ? "mt-1" : ""}>
-                          {formatDateTime(d.date, d.description)}
-                        </div>
+                {/* Details table (Dynamically mapped from JSON) */}
+                <table className="corporate-meta-table w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
+                  <tbody>
+                    {TEMPLATE.headerFields
+                      .filter((f) => f.id !== "school" && f.id !== "programme")
+                      .map((field, i) => (
+                        <tr
+                          key={i}
+                          className="border-b border-black print:break-inside-avoid"
+                        >
+                          <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                            {field.label}
+                          </th>
+                          <td className="py-2.5 px-4">
+                            {field.type === "date"
+                              ? formatDateOnly(formData[field.id] as string)
+                              : (formData[field.id] as string)}
+                          </td>
+                        </tr>
                       ))}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-black print:break-inside-avoid">
-                    <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                      Submission Location
-                    </th>
-                    <td className="py-2.5 px-4">
-                      {formData.submissionLocation as string}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-black print:break-inside-avoid">
-                    <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                      Return of Feedback
-                    </th>
-                    <td className="py-2.5 px-4">
-                      {formData.returnOfFeedback as string}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    <tr className="border-b border-black print:break-inside-avoid">
+                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                        Submission / Exam Date(s)
+                      </th>
+                      <td className="py-2.5 px-4">
+                        {formData.submissionDates?.map(
+                          (d: any, idx: number) => (
+                            <div key={idx} className={idx > 0 ? "mt-1" : ""}>
+                              {formatDateTime(d.date, d.description)}
+                            </div>
+                          ),
+                        )}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-black print:break-inside-avoid">
+                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                        Submission Location
+                      </th>
+                      <td className="py-2.5 px-4">
+                        {formData.submissionLocation as string}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-black print:break-inside-avoid">
+                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
+                        Return of Feedback
+                      </th>
+                      <td className="py-2.5 px-4">
+                        {formData.returnOfFeedback as string}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-              {/* Dynamic Content Sections Mapping */}
-              {TEMPLATE.pdfGroupOrder.map((groupTitle) => {
-                const sectionsInGroup = TEMPLATE.contentSections.filter(
-                  (s) => s.pdfGroup === groupTitle,
-                );
-                const isOverview =
-                  groupTitle === "Overview & Learning Outcomes";
-                const isTaskSpec = groupTitle === "Task Specification";
-                const isEvalGroup = groupTitle === "Evaluation & Grading";
+                {/* Dynamic Content Sections Mapping */}
+                {TEMPLATE.pdfGroupOrder.map((groupTitle) => {
+                  const sectionsInGroup = TEMPLATE.contentSections.filter(
+                    (s) => s.pdfGroup === groupTitle,
+                  );
+                  const isOverview =
+                    groupTitle === "Overview & Learning Outcomes";
+                  const isTaskSpec = groupTitle === "Task Specification";
+                  const isEvalGroup = groupTitle === "Evaluation & Grading";
 
-                const hasVisibleDynamic = sectionsInGroup.some(
-                  (s) => sectionToggles[s.id] && formData[s.id],
-                );
-                const hasSkills = isOverview && selectedSkills.length > 0;
-                const hasGroupWork =
-                  isTaskSpec && formData.groupWorkPermitted === "Yes";
-                const hasGradingMatrix =
-                  isEvalGroup &&
-                  sectionToggles.gradingMatrix &&
-                  rubricRows.length > 0;
+                  const hasVisibleDynamic = sectionsInGroup.some(
+                    (s) => sectionToggles[s.id] && formData[s.id],
+                  );
+                  const hasSkills = isOverview && selectedSkills.length > 0;
+                  const hasGroupWork =
+                    isTaskSpec && formData.groupWorkPermitted === "Yes";
+                  const hasGradingMatrix =
+                    isEvalGroup &&
+                    sectionToggles.gradingMatrix &&
+                    rubricRows.length > 0;
 
-                if (
-                  !hasVisibleDynamic &&
-                  !hasSkills &&
-                  !hasGroupWork &&
-                  !hasGradingMatrix
-                )
-                  return null;
+                  if (
+                    !hasVisibleDynamic &&
+                    !hasSkills &&
+                    !hasGroupWork &&
+                    !hasGradingMatrix
+                  )
+                    return null;
 
-                return (
-                  <div
-                    key={groupTitle}
-                    className="corporate-section mb-8 break-inside-avoid print:break-inside-avoid"
-                  >
-                    <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                      {groupTitle}
-                    </h3>
+                  return (
+                    <div
+                      key={groupTitle}
+                      className="corporate-section mb-8 break-inside-avoid print:break-inside-avoid"
+                    >
+                      <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+                        {groupTitle}
+                      </h3>
 
-                    {/* Special Injections based on Group */}
-                    {isTaskSpec && hasGroupWork && (
-                      <div className="mb-4">
-                        <strong>
-                          Group Mechanics (Target Size: {formData.groupSize}):
-                        </strong>{" "}
-                        <MarkdownRenderer
-                          content={formData.groupMechanics as string}
-                          images={uploadedImages}
-                        />
-                      </div>
-                    )}
-
-                    {/* Render standard configured sections */}
-                    {sectionsInGroup.map((s) => {
-                      if (!sectionToggles[s.id] || !formData[s.id]) return null;
-                      return (
-                        <div key={s.id} className="mb-4">
-                          {s.pdfLabelStyle === "inline" && (
-                            <strong>{s.label}: </strong>
-                          )}
-                          {s.pdfLabelStyle === "heading" && (
-                            <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
-                              {s.label}:
-                            </h4>
-                          )}
+                      {/* Special Injections based on Group */}
+                      {isTaskSpec && hasGroupWork && (
+                        <div className="mb-4">
+                          <strong>
+                            Group Mechanics (Target Size: {formData.groupSize}):
+                          </strong>{" "}
                           <MarkdownRenderer
-                            content={formData[s.id] as string}
+                            content={formData.groupMechanics as string}
                             images={uploadedImages}
                           />
                         </div>
-                      );
-                    })}
+                      )}
 
-                    {/* Special Injection for Skills at end of Overview */}
-                    {isOverview && hasSkills && (
-                      <div className="mb-3 mt-6 text-[11pt]">
-                        <strong>Employability Skills Assessed:</strong>{" "}
-                        {selectedSkills.join(", ")}
-                      </div>
-                    )}
+                      {/* Render standard configured sections */}
+                      {sectionsInGroup.map((s) => {
+                        if (!sectionToggles[s.id] || !formData[s.id])
+                          return null;
+                        return (
+                          <div key={s.id} className="mb-4">
+                            {s.pdfLabelStyle === "inline" && (
+                              <strong>{s.label}: </strong>
+                            )}
+                            {s.pdfLabelStyle === "heading" && (
+                              <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
+                                {s.label}:
+                              </h4>
+                            )}
+                            <MarkdownRenderer
+                              content={formData[s.id] as string}
+                              images={uploadedImages}
+                            />
+                          </div>
+                        );
+                      })}
 
-                    {/* Special Injection for Grading Matrix at end of Evaluation block */}
-                    {hasGradingMatrix && (
-                      <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
-                        <thead className="break-inside-avoid print:break-inside-avoid">
-                          <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
-                            <th className="border-r border-black p-1.5 w-[14%]">
-                              Component
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[7%] text-[7pt]">
-                              Weight
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[13.1%]">
-                              Fail (&lt;40%)
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[13.1%]">
-                              Pass (40-49%)
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[13.1%]">
-                              2:2 (50-59%)
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[13.1%]">
-                              2:1 (60-69%)
-                            </th>
-                            <th className="border-r border-black p-1.5 w-[13.1%]">
-                              1st (70-84%)
-                            </th>
-                            <th className="p-1.5 w-[13.1%]">Excelled (85%+)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rubricRows.map((row) => (
-                            <tr
-                              key={row.id}
-                              className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
-                            >
-                              <td className="border-r border-black p-1.5 font-bold print-bg-gray-light bg-gray-50 break-words">
-                                {row.component}
-                              </td>
-                              <td className="border-r border-black p-1.5 text-center font-bold print-bg-gray-light bg-gray-50">
-                                {row.weight}
-                              </td>
-                              <td className="border-r border-black p-1.5 break-words">
-                                {row.fail}
-                              </td>
-                              <td className="border-r border-black p-1.5 break-words">
-                                {row.pass}
-                              </td>
-                              <td className="border-r border-black p-1.5 break-words">
-                                {row.twoTwo}
-                              </td>
-                              <td className="border-r border-black p-1.5 break-words">
-                                {row.twoOne}
-                              </td>
-                              <td className="border-r border-black p-1.5 break-words">
-                                {row.first}
-                              </td>
-                              <td className="p-1.5 break-words">
-                                {row.excelled}
-                              </td>
+                      {/* Special Injection for Skills at end of Overview */}
+                      {isOverview && hasSkills && (
+                        <div className="mb-3 mt-6 text-[11pt]">
+                          <strong>Employability Skills Assessed:</strong>{" "}
+                          {selectedSkills.join(", ")}
+                        </div>
+                      )}
+
+                      {/* Special Injection for Grading Matrix at end of Evaluation block */}
+                      {hasGradingMatrix && (
+                        <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
+                          <thead className="break-inside-avoid print:break-inside-avoid">
+                            <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
+                              <th className="border-r border-black p-1.5 w-[14%]">
+                                Component
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[7%] text-[7pt]">
+                                Weight
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[13.1%]">
+                                Fail (&lt;40%)
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[13.1%]">
+                                Pass (40-49%)
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[13.1%]">
+                                2:2 (50-59%)
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[13.1%]">
+                                2:1 (60-69%)
+                              </th>
+                              <th className="border-r border-black p-1.5 w-[13.1%]">
+                                1st (70-84%)
+                              </th>
+                              <th className="p-1.5 w-[13.1%]">
+                                Excelled (85%+)
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
+                          </thead>
+                          <tbody>
+                            {rubricRows.map((row) => (
+                              <tr
+                                key={row.id}
+                                className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
+                              >
+                                <td className="border-r border-black p-1.5 font-bold print-bg-gray-light bg-gray-50 break-words">
+                                  {row.component}
+                                </td>
+                                <td className="border-r border-black p-1.5 text-center font-bold print-bg-gray-light bg-gray-50">
+                                  {row.weight}
+                                </td>
+                                <td className="border-r border-black p-1.5 break-words">
+                                  {row.fail}
+                                </td>
+                                <td className="border-r border-black p-1.5 break-words">
+                                  {row.pass}
+                                </td>
+                                <td className="border-r border-black p-1.5 break-words">
+                                  {row.twoTwo}
+                                </td>
+                                <td className="border-r border-black p-1.5 break-words">
+                                  {row.twoOne}
+                                </td>
+                                <td className="border-r border-black p-1.5 break-words">
+                                  {row.first}
+                                </td>
+                                <td className="p-1.5 break-words">
+                                  {row.excelled}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Academic Integrity */}
+                <div className="corporate-integrity mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
+                  <p className="corporate-warning font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
+                    {staticContent.academicIntegrity.warning}
+                  </p>
+                  <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
+                    {staticContent.academicIntegrity.title}
+                  </h3>
+                  <MarkdownRenderer
+                    content={staticContent.academicIntegrity.body}
+                  />
+                  <div className="corporate-notice p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
+                    {staticContent.academicIntegrity.groupWorkPrefix}{" "}
+                    <strong className="uppercase font-extrabold">
+                      {formData.groupWorkPermitted === "Yes"
+                        ? "PERMITTED"
+                        : "NOT PERMITTED"}
+                    </strong>
+                    .{" "}
+                    {formData.groupWorkPermitted === "No" &&
+                      staticContent.academicIntegrity.individualWarning}
                   </div>
-                );
-              })}
-
-              {/* Academic Integrity */}
-              <div className="corporate-integrity mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
-                <p className="corporate-warning font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
-                  {staticContent.academicIntegrity.warning}
-                </p>
-                <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
-                  {staticContent.academicIntegrity.title}
-                </h3>
-                <MarkdownRenderer
-                  content={staticContent.academicIntegrity.body}
-                />
-                <div className="corporate-notice p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
-                  {staticContent.academicIntegrity.groupWorkPrefix}{" "}
-                  <strong className="uppercase font-extrabold">
-                    {formData.groupWorkPermitted === "Yes"
-                      ? "PERMITTED"
-                      : "NOT PERMITTED"}
-                  </strong>
-                  .{" "}
-                  {formData.groupWorkPermitted === "No" &&
-                    staticContent.academicIntegrity.individualWarning}
                 </div>
-              </div>
 
-              {/* AI Policy */}
-              <div className="corporate-ai-section mb-8">
-                <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                  {staticContent.aiPolicy.title}
-                </h3>
-                <p className="mb-4 text-[11pt] leading-relaxed">
-                  {staticContent.aiPolicy.preamble}
-                </p>
+                {/* AI Policy */}
+                <div className="corporate-ai-section mb-8">
+                  <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
+                    {staticContent.aiPolicy.title}
+                  </h3>
+                  <p className="mb-4 text-[11pt] leading-relaxed">
+                    {staticContent.aiPolicy.preamble}
+                  </p>
 
-                <div className="break-inside-avoid print:break-inside-avoid">
-                  <table className="corporate-ai-tiers table-fixed w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
-                    <tbody>
-                      <tr>
-                        <td
-                          className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "RED" ? "bg-red-200 print-bg-red" : ""}`}
-                        >
-                          🔴 RED {formData.aiPolicy === "RED" ? "✓" : ""}
-                        </td>
-                        <td
-                          className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "AMBER" ? "bg-yellow-200 print-bg-yellow" : ""}`}
-                        >
-                          🟡 AMBER {formData.aiPolicy === "AMBER" ? "✓" : ""}
-                        </td>
-                        <td
-                          className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "GREEN" ? "bg-green-200 print-bg-green" : ""}`}
-                        >
-                          🟢 GREEN {formData.aiPolicy === "GREEN" ? "✓" : ""}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <div
-                    className="corporate-policy-box border-2 border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6"
-                    data-policy={formData.aiPolicy}
-                  >
-                    {formData.aiPolicy === "RED" && (
-                      <>
-                        <h4 className="font-bold text-red-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                          {staticContent.aiPolicy.redTitle}
-                        </h4>
-                        <MarkdownRenderer
-                          content={staticContent.aiPolicy.redBody}
-                        />
-                      </>
-                    )}
-                    {formData.aiPolicy === "AMBER" && (
-                      <>
-                        <h4 className="font-bold text-yellow-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                          {staticContent.aiPolicy.amberTitle}
-                        </h4>
-                        <p className="mb-3">
-                          {staticContent.aiPolicy.amberBody}
-                        </p>
-                        <p className="mb-2">
-                          <strong>Permitted Uses:</strong>{" "}
-                          {formData.aiAmberPermitted as string}
-                        </p>
-                        <p className="mb-3">
-                          <strong>Prohibited Uses:</strong>{" "}
-                          {formData.aiAmberProhibited as string}
-                        </p>
-                        <div className="italic">
+                  <div className="break-inside-avoid print:break-inside-avoid">
+                    <table className="corporate-ai-tiers table-fixed w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
+                      <tbody>
+                        <tr>
+                          <td
+                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "RED" ? "bg-red-200 print-bg-red" : ""}`}
+                          >
+                            🔴 RED {formData.aiPolicy === "RED" ? "✓" : ""}
+                          </td>
+                          <td
+                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "AMBER" ? "bg-yellow-200 print-bg-yellow" : ""}`}
+                          >
+                            🟡 AMBER {formData.aiPolicy === "AMBER" ? "✓" : ""}
+                          </td>
+                          <td
+                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "GREEN" ? "bg-green-200 print-bg-green" : ""}`}
+                          >
+                            🟢 GREEN {formData.aiPolicy === "GREEN" ? "✓" : ""}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div
+                      className="corporate-policy-box border-2 border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6"
+                      data-policy={formData.aiPolicy}
+                    >
+                      {formData.aiPolicy === "RED" && (
+                        <>
+                          <h4 className="font-bold text-red-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                            {staticContent.aiPolicy.redTitle}
+                          </h4>
                           <MarkdownRenderer
-                            content={staticContent.aiPolicy.amberDeclaration}
+                            content={staticContent.aiPolicy.redBody}
                           />
-                        </div>
-                      </>
-                    )}
-                    {formData.aiPolicy === "GREEN" && (
-                      <>
-                        <h4 className="font-bold text-green-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                          {staticContent.aiPolicy.greenTitle}
-                        </h4>
-                        <p className="mb-3">
-                          {staticContent.aiPolicy.greenBody}
-                        </p>
-                        <p className="mb-3">
-                          <strong>Permitted Uses:</strong>{" "}
-                          {formData.aiGreenPermitted as string}
-                        </p>
-                        <div className="italic">
-                          <MarkdownRenderer
-                            content={staticContent.aiPolicy.greenDeclaration}
-                          />
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
+                      {formData.aiPolicy === "AMBER" && (
+                        <>
+                          <h4 className="font-bold text-yellow-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                            {staticContent.aiPolicy.amberTitle}
+                          </h4>
+                          <p className="mb-3">
+                            {staticContent.aiPolicy.amberBody}
+                          </p>
+                          <p className="mb-2">
+                            <strong>Permitted Uses:</strong>{" "}
+                            {formData.aiAmberPermitted as string}
+                          </p>
+                          <p className="mb-3">
+                            <strong>Prohibited Uses:</strong>{" "}
+                            {formData.aiAmberProhibited as string}
+                          </p>
+                          <div className="italic">
+                            <MarkdownRenderer
+                              content={staticContent.aiPolicy.amberDeclaration}
+                            />
+                          </div>
+                        </>
+                      )}
+                      {formData.aiPolicy === "GREEN" && (
+                        <>
+                          <h4 className="font-bold text-green-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
+                            {staticContent.aiPolicy.greenTitle}
+                          </h4>
+                          <p className="mb-3">
+                            {staticContent.aiPolicy.greenBody}
+                          </p>
+                          <p className="mb-3">
+                            <strong>Permitted Uses:</strong>{" "}
+                            {formData.aiGreenPermitted as string}
+                          </p>
+                          <div className="italic">
+                            <MarkdownRenderer
+                              content={staticContent.aiPolicy.greenDeclaration}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -11,9 +11,15 @@
     },
     {
       "id": "programme",
-      "label": "Programme / Year",
-      "default": "BSc Computing Science 2026-2027",
+      "label": "Programme",
+      "default": "BSc Computing Science",
       "type": "text"
+    },
+    {
+      "id": "academicYear",
+      "label": "Academic Year",
+      "default": "2026-2027",
+      "type": "select"
     },
     {
       "id": "module",

@@ -104,6 +104,18 @@ export type Database = {
           unique_owners: number;
         }[];
       };
+      admin_list_users: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          display_name: string;
+          is_admin: boolean;
+          user_id: string;
+        }[];
+      };
+      admin_promote_user: {
+        Args: { target_user_id: string };
+        Returns: undefined;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

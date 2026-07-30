@@ -47,6 +47,114 @@ button {
     --ui-muted: #64748b;
 }
 
+/* --- Administration workspace --- */
+.panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 1.25rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+}
+
+.eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.button-primary,
+.button-secondary,
+.button-dark,
+.icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    line-height: 1.25rem;
+}
+
+.button-primary,
+.button-secondary,
+.button-dark {
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+}
+
+.button-primary {
+    border: 1px solid #0f172a;
+    background: #0f172a;
+    color: #fff;
+}
+
+.button-primary:hover,
+.button-dark:hover {
+    background: #334155;
+}
+
+.button-secondary {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+}
+
+.button-secondary:hover,
+.icon-button:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.button-dark {
+    border: 1px solid #0f172a;
+    background: #0f172a;
+    color: #fff;
+}
+
+.icon-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 650;
+    color: #475569;
+}
+
+.filter-control {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    margin-top: 0.5rem;
+    border: 1px solid #dbe1e8;
+    border-radius: 0.875rem;
+    background: #f8fafc;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 450;
+    color: #0f172a;
+    outline: none;
+}
+
+.filter-control:hover {
+    border-color: #cbd5e1;
+    background: #fff;
+}
+
+.filter-control:focus {
+    border-color: #64748b;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.1);
+}
+
 .app-shell {
     background: #0f172a;
 }
@@ -878,8 +986,14 @@ button {
     }
 
     /* Remove the web preview container constraints */
+    .pdf-preview-stage {
+        width: auto !important;
+        min-height: 0 !important;
+    }
+
     .pdf-page {
         zoom: 1 !important;
+        transform: none !important;
         width: auto !important; /* Let the browser dictate width */
         min-height: 0 !important;
         padding: 0 !important; /* Strip web padding, rely on @page margin */
