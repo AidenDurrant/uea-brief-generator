@@ -1138,6 +1138,90 @@ export default function BriefGenerator() {
                 </div>
               </div>
 
+              {/* Group Mechanics appears directly beneath the group-work selector */}
+              {formData.groupWorkPermitted === "Yes" && (
+                <div className="mt-5 p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                        Group Mechanics
+                      </label>
+                      <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1 shadow-sm">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="10"
+                          height="10"
+                          className="shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect
+                            x="3"
+                            y="3"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          ></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleImageUpload(e, "groupMechanics")
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Target Group Size:
+                      </label>
+                      <select
+                        className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer border-indigo-200`}
+                        value={formData.groupSize || ""}
+                        onChange={(e) =>
+                          handleChange("groupSize", e.target.value)
+                        }
+                      >
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="2-3">2-3</option>
+                        <option value="3-4">3-4</option>
+                        <option value="4-5">4-5</option>
+                        <option value="5-6">5-6</option>
+                        <option value="Variable">Variable</option>
+                      </select>
+                    </div>
+                    <textarea
+                      className={`${INPUT} font-mono h-28 leading-relaxed resize-y border-indigo-200 focus:border-indigo-500`}
+                      value={(formData.groupMechanics as string) || ""}
+                      onChange={(e) =>
+                        handleChange("groupMechanics", e.target.value)
+                      }
+                      onKeyDown={(e) =>
+                        handleTab(e, (val) =>
+                          handleChange("groupMechanics", val),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
               <div
                 style={{
                   borderTop: "1px solid #f1f5f9",
@@ -1386,90 +1470,6 @@ export default function BriefGenerator() {
             <section className="ui-card overflow-hidden box-border">
               <SectionHeading step={5} title="Content Specifications" />
               <div className="space-y-4 max-w-full">
-                {/* Special Injection for Group Mechanics Editor if Permitted */}
-                {formData.groupWorkPermitted === "Yes" && (
-                  <div className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
-                          Group Mechanics
-                        </label>
-                        <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1 shadow-sm">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="10"
-                            height="10"
-                            className="shrink-0"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <rect
-                              x="3"
-                              y="3"
-                              width="18"
-                              height="18"
-                              rx="2"
-                              ry="2"
-                            ></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                          </svg>
-                          Add Image
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleImageUpload(e, "groupMechanics")
-                            }
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
-                        <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                          Target Group Size:
-                        </label>
-                        <select
-                          className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer border-indigo-200`}
-                          value={formData.groupSize || ""}
-                          onChange={(e) =>
-                            handleChange("groupSize", e.target.value)
-                          }
-                        >
-                          <option value="2">2</option>
-                          <option value="3">3</option>
-                          <option value="4">4</option>
-                          <option value="5">5</option>
-                          <option value="6">6</option>
-                          <option value="2-3">2-3</option>
-                          <option value="3-4">3-4</option>
-                          <option value="4-5">4-5</option>
-                          <option value="5-6">5-6</option>
-                          <option value="Variable">Variable</option>
-                        </select>
-                      </div>
-                      <textarea
-                        className={`${INPUT} font-mono h-28 leading-relaxed resize-y border-indigo-200 focus:border-indigo-500`}
-                        value={(formData.groupMechanics as string) || ""}
-                        onChange={(e) =>
-                          handleChange("groupMechanics", e.target.value)
-                        }
-                        onKeyDown={(e) =>
-                          handleTab(e, (val) =>
-                            handleChange("groupMechanics", val),
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-
                 {/* Loop through JSON content sections (excluding Eval block) */}
                 {TEMPLATE.contentSections
                   .filter((f) => f.pdfGroup !== "Evaluation & Grading")
