@@ -16,11 +16,6 @@ const nextConfig: NextConfig = {
   basePath,
   trailingSlash: true,
 
-  // Expose the build-time path so public assets can include it explicitly.
-  env: {
-    NEXT_PUBLIC_BASE_PATH: basePath,
-  },
-
   // GitHub Pages has no Next.js image optimisation server.
   images: {
     unoptimized: true,
