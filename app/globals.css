@@ -496,6 +496,30 @@ button {
     padding-left: 1.5em;
     margin-bottom: 0.75em;
 }
+.markdown-content table {
+    width: 100%;
+    margin: 1em 0;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+.markdown-content th,
+.markdown-content td {
+    border: 1px solid #94a3b8;
+    padding: 0.55em 0.7em;
+    text-align: left;
+    vertical-align: top;
+}
+.markdown-content th {
+    background: #f1f5f9;
+    font-weight: 700;
+}
+.markdown-content .katex-display {
+    max-width: 100%;
+    margin: 1em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25em 0;
+}
 .markdown-content code {
     background: #f1f5f9;
     padding: 0.2em 0.4em;
@@ -951,6 +975,41 @@ button {
     color: #14532d;
 }
 
+.draft-watermark {
+    position: absolute;
+    top: 43%;
+    left: 50%;
+    z-index: 50;
+    display: grid;
+    width: 150mm;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    pointer-events: none;
+    place-items: center;
+    color: rgba(153, 27, 27, 0.14);
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.print-page-watermark {
+    display: none;
+}
+
+.draft-watermark span,
+.print-page-watermark span {
+    font-size: 58pt;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.12em;
+}
+
+.draft-watermark small,
+.print-page-watermark small {
+    margin-top: 8px;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+}
+
 /* --- Print Styles --- */
 @media print {
     @page {
@@ -983,6 +1042,27 @@ button {
     }
     .print-bg-green {
         background-color: #bbf7d0 !important;
+    }
+
+    /* The browser does not reliably repeat fixed elements across fragmented
+       print pages. Render one absolutely positioned watermark per A4 content
+       page instead; these are real print elements, not page backgrounds. */
+    .draft-watermark {
+        display: none !important;
+    }
+
+    .print-page-watermark {
+        position: absolute !important;
+        left: 50% !important;
+        z-index: 9999 !important;
+        display: grid !important;
+        width: 150mm;
+        transform: translate(-50%, -50%) rotate(-30deg);
+        pointer-events: none;
+        place-items: center;
+        color: rgba(153, 27, 27, 0.14) !important;
+        text-align: center;
+        text-transform: uppercase;
     }
 
     /* Remove the web preview container constraints */

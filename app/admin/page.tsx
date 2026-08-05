@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { Assessment, Json } from "@/lib/database.types";
+import type { Assessment, Database, Json } from "@/lib/database.types";
+import { AppHeader } from "@/app/components/app-header";
 
 type AccessState = "loading" | "signed-out" | "denied" | "admin";
 type AdminDirectoryUser = {
@@ -11,6 +12,16 @@ type AdminDirectoryUser = {
   display_name: string;
   is_admin: boolean;
 };
+type WorkflowUser =
+  Database["public"]["Functions"]["admin_review_workflow_users"]["Returns"][number];
+type ReviewEvent =
+  Database["public"]["Tables"]["assessment_review_events"]["Row"];
+type WorkflowRole =
+  | "cluster_lead"
+  | "ai_reviewer"
+  | "employability_reviewer"
+  | "teaching_director";
+type WorkflowCapability = WorkflowRole;
 type Deadline = {
   assessmentId: string;
   assessmentTitle: string;
@@ -38,6 +49,37 @@ type SavedBriefContent = {
 
 const ALL = "all";
 const LONG_TEXT_THRESHOLD = 100;
+const REVIEWER_ROLES: {
+  value: WorkflowRole;
+  label: string;
+  description: string;
+  capability: WorkflowCapability;
+}[] = [
+  {
+    value: "cluster_lead",
+    label: "Cluster Lead",
+    description: "Academic review for assigned programme and level scopes",
+    capability: "cluster_lead",
+  },
+  {
+    value: "ai_reviewer",
+    label: "AI Suitability Reviewer",
+    description: "Assessment AI policy and suitability validation",
+    capability: "ai_reviewer",
+  },
+  {
+    value: "employability_reviewer",
+    label: "Employability Skills Reviewer",
+    description: "Employability skills selection and wording validation",
+    capability: "employability_reviewer",
+  },
+];
+const TEACHING_DIRECTOR_ROLE = {
+  value: "teaching_director" as const,
+  label: "Teaching Director",
+  description: "Full oversight with distinct Teaching Director traceability",
+  capability: "teaching_director" as const,
+};
 
 const formatDate = (value: string | Date, includeTime = false) => {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -285,12 +327,17 @@ export default function AdminDashboard() {
   const [directoryUsers, setDirectoryUsers] = useState<AdminDirectoryUser[]>(
     [],
   );
+  const [workflowUsers, setWorkflowUsers] = useState<WorkflowUser[]>([]);
+  const [reviewEvents, setReviewEvents] = useState<ReviewEvent[]>([]);
   const [currentProfileName, setCurrentProfileName] = useState("");
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(
     null,
   );
+  const [changingWorkflowRole, setChangingWorkflowRole] = useState<
+    string | null
+  >(null);
 
   const [search, setSearch] = useState("");
   const [academicYear, setAcademicYear] = useState(ALL);
@@ -317,6 +364,8 @@ export default function AdminDashboard() {
       if (!nextUser) {
         setAssessments([]);
         setDirectoryUsers([]);
+        setWorkflowUsers([]);
+        setReviewEvents([]);
         setCurrentProfileName("");
         setProfileNames({});
         setAccessState("signed-out");
@@ -342,37 +391,63 @@ export default function AdminDashboard() {
       }
       setCurrentProfileName(ownProfile.display_name);
 
-      const { data: membership, error: membershipError } = await client
-        .from("admin_users")
-        .select("user_id")
-        .eq("user_id", nextUser.id)
-        .maybeSingle();
+      const [adminMembership, teachingDirectorMembership] = await Promise.all([
+        client
+          .from("admin_users")
+          .select("user_id")
+          .eq("user_id", nextUser.id)
+          .maybeSingle(),
+        client
+          .from("reviewer_roles")
+          .select("user_id")
+          .eq("user_id", nextUser.id)
+          .eq("role", "teaching_director")
+          .maybeSingle(),
+      ]);
 
-      if (membershipError || !membership) {
-        setError(membershipError?.message ?? null);
+      if (adminMembership.error || teachingDirectorMembership.error) {
+        setError(
+          adminMembership.error?.message ||
+            teachingDirectorMembership.error?.message ||
+            null,
+        );
+        setAccessState("denied");
+        return;
+      }
+      if (!adminMembership.data && !teachingDirectorMembership.data) {
         setAccessState("denied");
         return;
       }
 
-      const [assessmentResult, directoryResult] = await Promise.all([
+      const [
+        assessmentResult,
+        directoryResult,
+        workflowUsersResult,
+        reviewEventsResult,
+      ] = await Promise.all([
         client
           .from("assessments")
           .select("*")
           .order("updated_at", { ascending: false }),
         client.rpc("admin_list_users"),
+        client.rpc("admin_review_workflow_users"),
+        client
+          .from("assessment_review_events")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200),
       ]);
+      const loadErrors: string[] = [];
 
       if (assessmentResult.error) {
-        setError(assessmentResult.error.message);
+        loadErrors.push(assessmentResult.error.message);
         setAssessments([]);
       } else {
         setAssessments(assessmentResult.data ?? []);
       }
 
       if (directoryResult.error) {
-        setError((current) =>
-          [current, directoryResult.error.message].filter(Boolean).join(" "),
-        );
+        loadErrors.push(directoryResult.error.message);
         setDirectoryUsers([]);
         setProfileNames({});
       } else {
@@ -384,6 +459,22 @@ export default function AdminDashboard() {
           ),
         );
       }
+
+      if (workflowUsersResult.error) {
+        loadErrors.push(workflowUsersResult.error.message);
+        setWorkflowUsers([]);
+      } else {
+        setWorkflowUsers(workflowUsersResult.data ?? []);
+      }
+
+      if (reviewEventsResult.error) {
+        loadErrors.push(reviewEventsResult.error.message);
+        setReviewEvents([]);
+      } else {
+        setReviewEvents(reviewEventsResult.data ?? []);
+      }
+
+      setError(loadErrors.length > 0 ? loadErrors.join(" ") : null);
       setAccessState("admin");
     };
 
@@ -564,13 +655,13 @@ export default function AdminDashboard() {
   ) => {
     if (!supabase || target.is_admin === makeAdministrator) return;
     if (!makeAdministrator && target.user_id === user?.id) {
-      setError("You cannot demote your own administrator account.");
+      setError("You cannot demote your own Administrator account.");
       return;
     }
     if (
       !makeAdministrator &&
       !window.confirm(
-        `Change ${target.display_name} to a standard user? They will immediately lose administrator access.`,
+        `Remove Administrator access from ${target.display_name}? Their other roles will not be changed.`,
       )
     ) {
       return;
@@ -595,6 +686,42 @@ export default function AdminDashboard() {
       current.map((item) =>
         item.user_id === target.user_id
           ? { ...item, is_admin: makeAdministrator }
+          : item,
+      ),
+    );
+  };
+
+  const updateWorkflowRole = async (
+    target: WorkflowUser,
+    role: {
+      value: WorkflowRole;
+      label: string;
+      description: string;
+      capability: WorkflowCapability;
+    },
+  ) => {
+    if (!supabase) return;
+    const enabled = !target[role.capability];
+    const changeKey = `${target.user_id}:${role.value}`;
+    setChangingWorkflowRole(changeKey);
+    setError(null);
+
+    const result = await supabase.rpc("admin_set_workflow_role", {
+      enabled,
+      target_role: role.value,
+      target_user_id: target.user_id,
+    });
+    setChangingWorkflowRole(null);
+
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+
+    setWorkflowUsers((current) =>
+      current.map((item) =>
+        item.user_id === target.user_id
+          ? { ...item, [role.capability]: enabled }
           : item,
       ),
     );
@@ -627,7 +754,7 @@ export default function AdminDashboard() {
     return (
       <AdminMessage
         title="Checking access"
-        body="Loading your administrator session…"
+        body="Loading your Administrator or Teaching Director session…"
       />
     );
   }
@@ -635,7 +762,7 @@ export default function AdminDashboard() {
   if (accessState === "signed-out") {
     return (
       <AdminMessage
-        title="Administrator sign in"
+        title="Oversight sign in"
         body="Sign in with an approved GitHub account."
       >
         <button onClick={signIn} className="button-primary">
@@ -648,8 +775,8 @@ export default function AdminDashboard() {
   if (accessState === "denied") {
     return (
       <AdminMessage
-        title="Administrator access required"
-        body="Your account is authenticated but is not an administrator."
+        title="Oversight access required"
+        body="Your account is authenticated but is neither an Administrator nor a Teaching Director."
       >
         <button onClick={signOut} className="button-secondary">
           Sign out
@@ -660,38 +787,30 @@ export default function AdminDashboard() {
 
   return (
     <main className="min-h-screen bg-[#f6f7f9] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-8">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-xs font-bold tracking-wide text-white">
-              UEA
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Assessment oversight
-              </p>
-              <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
-                Administration workspace
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-slate-500 md:inline">
-              {currentProfileName ||
-                user?.user_metadata.user_name ||
-                user?.email}
-            </span>
-            <a href="./" className="button-secondary">
-              Back to builder
+      <AppHeader
+        eyebrow="Assessment brief management"
+        title="Administration workspace"
+        subtitle={
+          currentProfileName || user?.user_metadata.user_name || user?.email
+        }
+        maxWidthClass="max-w-375"
+        actionsLabel="Administration actions"
+        actions={
+          <>
+            <a href="./" className="button-primary">
+              My dashboard
             </a>
-            <button onClick={signOut} className="button-dark">
+            <a href="./builder" className="button-secondary">
+              Builder
+            </a>
+            <button onClick={signOut} className="button-secondary">
               Sign out
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <div className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-8 lg:px-10 lg:py-8">
+      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
         {error && (
           <div
             role="alert"
@@ -700,6 +819,122 @@ export default function AdminDashboard() {
             {error}
           </div>
         )}
+
+        <section className="panel overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+            <div>
+              <p className="eyebrow">Role-based review pools</p>
+              <h2 className="mt-0.5 text-base font-semibold tracking-tight">
+                Reviewer roles
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Reviews are available to every eligible role-holder rather than
+                one named person.
+              </p>
+            </div>
+            <a href="./reviews" className="button-secondary h-9 min-h-0 px-3">
+              Oversight queue
+            </a>
+          </div>
+
+          <div className="grid gap-3 border-b border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold text-slate-900">
+                MO / Instructor
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                The standard role for all users who create and submit briefs.
+              </p>
+            </div>
+            {REVIEWER_ROLES.map((role) => (
+              <div
+                key={role.value}
+                className="rounded-xl border border-slate-200 bg-white p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-slate-900">
+                    {role.label}
+                  </p>
+                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                    {
+                      workflowUsers.filter((item) => item[role.capability])
+                        .length
+                    }
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                  {role.description}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full min-w-180 border-collapse text-left text-xs">
+              <thead className="sticky top-0 z-10 border-b border-slate-200 bg-white text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5">User</th>
+                  {REVIEWER_ROLES.map((role) => (
+                    <th key={role.value} className="px-3 py-2.5">
+                      {role.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {workflowUsers.map((workflowUser) => (
+                  <tr
+                    key={workflowUser.user_id}
+                    className="hover:bg-slate-50/70"
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-slate-900">
+                      {workflowUser.display_name}
+                    </td>
+                    {REVIEWER_ROLES.map((role) => {
+                      const enabled = workflowUser[role.capability];
+                      const changeKey = `${workflowUser.user_id}:${role.value}`;
+                      return (
+                        <td key={role.value} className="px-3 py-2">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={enabled}
+                            onClick={() =>
+                              void updateWorkflowRole(workflowUser, role)
+                            }
+                            disabled={changingWorkflowRole !== null}
+                            className={`inline-flex min-w-28 items-center justify-between gap-3 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50 ${enabled ? "border-indigo-200 bg-indigo-50 text-indigo-800" : "border-slate-200 bg-white text-slate-500"}`}
+                          >
+                            <span>{enabled ? "Active" : "Standard"}</span>
+                            <span
+                              className={`relative h-4 w-7 rounded-full ${enabled ? "bg-indigo-600" : "bg-slate-300"}`}
+                              aria-hidden="true"
+                            >
+                              <span
+                                className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${enabled ? "translate-x-3.5" : "translate-x-0.5"}`}
+                              />
+                            </span>
+                            {changingWorkflowRole === changeKey && (
+                              <span className="sr-only">Updating</span>
+                            )}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-[10px] leading-4 text-slate-500">
+            Cluster Leads receive academic reviews only for their configured
+            programme and level scopes. Scope mappings can be loaded when the
+            programme, level and module list is supplied. AI Suitability and
+            Employability Skills are independent reviewer pools and must each
+            contain an eligible non-owner reviewer. Assessment owners can never
+            approve their own brief.
+          </div>
+        </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -724,7 +959,7 @@ export default function AdminDashboard() {
           />
         </section>
 
-        <section className="panel p-4 sm:p-6">
+        <section className="panel p-4">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="eyebrow">Refine the dataset</p>
@@ -936,6 +1171,67 @@ export default function AdminDashboard() {
 
         <section className="panel overflow-hidden">
           <div className="border-b border-slate-200 p-5 sm:p-6">
+            <p className="eyebrow">Workflow audit</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">
+              Review history
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Immutable workflow events showing historical assignments,
+              submissions, approvals, withdrawals and invalidated versions.
+            </p>
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {reviewEvents.map((event) => {
+              const assessment = assessments.find(
+                (item) => item.id === event.assessment_id,
+              );
+              return (
+                <div
+                  key={event.id}
+                  className="grid gap-2 border-b border-slate-100 px-5 py-4 text-sm last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-6"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
+                        {event.action.replaceAll("_", " ")}
+                      </span>
+                      {event.category && (
+                        <span className="text-xs font-semibold capitalize text-slate-500">
+                          {event.category} review
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">
+                        Version {event.assessment_version}
+                      </span>
+                    </div>
+                    <p className="mt-2 truncate font-semibold text-slate-900">
+                      {assessment?.title || "Deleted assessment"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Actor: {profileNames[event.actor_id || ""] || "System"}
+                      {event.reviewer_id &&
+                        ` · Reviewer: ${profileNames[event.reviewer_id] || event.reviewer_id}`}
+                    </p>
+                    {event.comment && (
+                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                        {event.comment}
+                      </p>
+                    )}
+                  </div>
+                  <time className="whitespace-nowrap text-xs text-slate-400">
+                    {formatDate(event.created_at, true)}
+                  </time>
+                </div>
+              );
+            })}
+            {reviewEvents.length === 0 && (
+              <EmptyState message="No review workflow events have been recorded yet." />
+            )}
+          </div>
+        </section>
+
+        <section className="panel overflow-hidden">
+          <div className="border-b border-slate-200 p-5 sm:p-6">
             <p className="eyebrow">Saved-variable analytics</p>
             <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -998,82 +1294,104 @@ export default function AdminDashboard() {
           <div className="border-b border-slate-200 p-5 sm:p-6">
             <p className="eyebrow">Access management</p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">
-              Administrators
+              Administrators and Teaching Directors
             </h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Assign registered users as administrators or standard users.
-              Administrators can view all saved assessment information, so
-              verify each user before changing their access.
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Both roles have full assessment, statistics and workflow powers,
+              but they remain separate for accountability and audit
+              traceability. Neither role is a mandatory approval category.
             </p>
           </div>
           <div className="grid divide-y divide-slate-100">
-            {directoryUsers.map((directoryUser) => (
-              <div
-                key={directoryUser.user_id}
-                className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-6"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-slate-900">
-                      {directoryUser.display_name}
-                    </p>
-                    {directoryUser.user_id === user?.id && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        You
-                      </span>
-                    )}
+            {directoryUsers.map((directoryUser) => {
+              const workflowUser = workflowUsers.find(
+                (item) => item.user_id === directoryUser.user_id,
+              );
+              const isTeachingDirector =
+                workflowUser?.teaching_director ?? false;
+              const teachingDirectorChangeKey = `${directoryUser.user_id}:teaching_director`;
+              const cannotRemoveOwnOnlyOversight =
+                directoryUser.user_id === user?.id &&
+                isTeachingDirector &&
+                !directoryUser.is_admin;
+              return (
+                <div key={directoryUser.user_id} className="px-5 py-4 sm:px-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">
+                          {directoryUser.display_name}
+                        </p>
+                        {directoryUser.user_id === user?.id && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate font-mono text-[11px] text-slate-400">
+                        {directoryUser.user_id}
+                      </p>
+                    </div>
+                    <div className="grid min-w-full gap-2 sm:min-w-120 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={directoryUser.is_admin}
+                        onClick={() =>
+                          void updateUserRole(
+                            directoryUser,
+                            !directoryUser.is_admin,
+                          )
+                        }
+                        disabled={
+                          changingRoleUserId !== null ||
+                          (directoryUser.user_id === user?.id &&
+                            directoryUser.is_admin)
+                        }
+                        className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${directoryUser.is_admin ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}
+                      >
+                        <span>Administrator</span>
+                        <span>
+                          {directoryUser.is_admin ? "Active" : "Not assigned"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isTeachingDirector}
+                        onClick={() =>
+                          workflowUser &&
+                          void updateWorkflowRole(
+                            workflowUser,
+                            TEACHING_DIRECTOR_ROLE,
+                          )
+                        }
+                        disabled={
+                          !workflowUser ||
+                          changingWorkflowRole !== null ||
+                          cannotRemoveOwnOnlyOversight
+                        }
+                        title={
+                          cannotRemoveOwnOnlyOversight
+                            ? "You cannot remove your only oversight role"
+                            : undefined
+                        }
+                        className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${isTeachingDirector ? "border-blue-200 bg-blue-50 text-blue-800" : "border-slate-200 bg-white text-slate-600"}`}
+                      >
+                        <span>Teaching Director</span>
+                        <span>
+                          {changingWorkflowRole === teachingDirectorChangeKey
+                            ? "Updating…"
+                            : isTeachingDirector
+                              ? "Active"
+                              : "Not assigned"}
+                        </span>
+                      </button>
+                    </div>
                   </div>
-                  <p className="truncate font-mono text-[11px] text-slate-400">
-                    {directoryUser.user_id}
-                  </p>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                      directoryUser.is_admin
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        directoryUser.is_admin
-                          ? "bg-emerald-500"
-                          : "bg-slate-400"
-                      }`}
-                    />
-                    {directoryUser.is_admin ? "Administrator" : "Standard user"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void updateUserRole(
-                        directoryUser,
-                        !directoryUser.is_admin,
-                      )
-                    }
-                    disabled={
-                      changingRoleUserId !== null ||
-                      directoryUser.user_id === user?.id
-                    }
-                    title={
-                      directoryUser.user_id === user?.id
-                        ? "You cannot change your own administrator role"
-                        : undefined
-                    }
-                    className="button-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {changingRoleUserId === directoryUser.user_id
-                      ? "Updating role…"
-                      : directoryUser.user_id === user?.id
-                        ? "Current account"
-                        : directoryUser.is_admin
-                          ? "Make standard user"
-                          : "Make administrator"}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {directoryUsers.length === 0 && (
               <EmptyState message="No completed user profiles are available." />
             )}
@@ -1105,10 +1423,10 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="panel p-5">
-      <div className="text-3xl font-semibold tracking-[-0.04em]">{value}</div>
-      <div className="mt-2 text-sm font-medium text-slate-700">{label}</div>
-      <div className="mt-0.5 text-xs text-slate-400">{detail}</div>
+    <div className="panel p-4">
+      <div className="text-2xl font-semibold tracking-[-0.04em]">{value}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-700">{label}</div>
+      <div className="mt-0.5 text-[10px] text-slate-400">{detail}</div>
     </div>
   );
 }
@@ -1390,6 +1708,24 @@ function CalendarPanel({
   );
 }
 
+function WorkflowStatusBadge({ status }: { status: string }) {
+  const style =
+    status === "approved"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "changes_requested"
+        ? "bg-amber-50 text-amber-700"
+        : status === "in_review"
+          ? "bg-blue-50 text-blue-700"
+          : "bg-slate-100 text-slate-600";
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${style}`}
+    >
+      {status.replaceAll("_", " ")}
+    </span>
+  );
+}
+
 function PolicyBadge({ value }: { value: string }) {
   const style =
     value === "RED"
@@ -1440,7 +1776,7 @@ function AdminMessage({
           href="./"
           className="mt-6 inline-block text-sm font-semibold text-slate-700 hover:text-slate-950"
         >
-          Back to builder
+          Back to dashboard
         </a>
       </div>
     </main>

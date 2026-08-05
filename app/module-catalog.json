@@ -1,0 +1,142 @@
+{
+  "schools": [
+    {
+      "name": "School of Computing Sciences",
+      "programmes": [
+        {
+          "name": "Computing Science BSc",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-3002A", "CMP-3005A", "CMP-3006B", "CMP-3007B", "CMP-4002B", "CMP-4004B", "CMP-4005B", "CMP-4008A", "CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5003B", "CMP-5010B", "CMP-5012B", "CMP-5013A", "CMP-5014B", "CMP-5015A", "CMP-5027A", "CMP-5037B", "CMP-5046B", "CMP-5047A", "CMP-5049Y", "CMP-5058A", "CMP-6003B", "CMP-6013Y", "CMP-6026A", "CMP-6035B", "CMP-6039A", "CMP-6044A", "CMP-6045B", "CMP-6046B", "CMP-6048A", "CMP-6055Y", "CMP-6056B", "CMP-6057A", "CMP-6058A", "CMP-6059B"]
+        },
+        {
+          "name": "Computer Systems Engineering BEng",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-3002A", "CMP-3005A", "CMP-3006B", "CMP-3007B", "CMP-4002B", "CMP-4004B", "CMP-4005B", "CMP-4008A", "CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5012B", "CMP-5013A", "CMP-5014B", "CMP-5015A", "CMP-5027A", "CMP-5037B", "CMP-5046B", "CMP-5049Y", "CMP-6013Y", "CMP-6026A", "CMP-6044A", "CMP-6045B", "CMP-6046B", "CMP-6048A", "CMP-6055Y", "CMP-6057A", "CMP-6058A", "CMP-6059B"]
+        },
+        {
+          "name": "Computer Science with Cyber Security BSc",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-3002A", "CMP-3005A", "CMP-3006B", "CMP-3007B", "CMP-4002B", "CMP-4004B", "CMP-4005B", "CMP-4008A", "CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5012B", "CMP-5013A", "CMP-5014B", "CMP-5015A", "CMP-5037B", "CMP-5047A", "CMP-5049Y", "CMP-6026A", "CMP-5027A", "CMP-6039A", "CMP-6057A", "CMP-6058A", "CMP-6048A", "CMP-6045B", "CMP-7037A", "CMP-5003B", "CMP-5010B", "CMP-5046B", "CMP-6035B", "CMP-6003B", "CMP-6046B", "CMP-6056B", "CMP-6059B"]
+        },
+        {
+          "name": "Computing and Creative Technologies BSc",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-3002A", "CMP-3005A", "CMP-3006B", "CMP-3007B", "CMP-4002B", "CMP-4004B", "CMP-4005B", "CMP-4008A", "CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5003B", "CMP-5010B", "CMP-5012B", "CMP-5014B", "CMP-5015A", "CMP-5027A", "CMP-5037B", "CMP-6003B", "CMP-6013Y", "CMP-6026A", "CMP-6035B", "CMP-6039A", "CMP-6044A", "CMP-6045B", "CMP-6046B", "CMP-6048A", "CMP-6056B", "CMP-6058A", "CMP-6059B"]
+        },
+        {
+          "name": "Artificial Intelligence BSc",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-3002A", "CMP-3005A", "CMP-3006B", "CMP-3007B", "CMP-4002B", "CMP-4004B", "CMP-4005B", "CMP-4008A", "CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5012B", "CMP-5014B", "CMP-5015A", "CMP-5047A", "CMP-5049Y", "CMP-5058A", "CMP-6013Y", "CMP-6026A", "CMP-6035B", "CMP-6039A", "CMP-6044A", "CMP-6048A", "CMP-6057A", "CMP-6059B"]
+        },
+        {
+          "name": "Business Information Systems BSc",
+          "studyLevel": "Undergraduate",
+          "moduleCodes": ["CMP-4009B", "CMP-4010B", "CMP-4011A", "CMP-4013A", "CMP-5003B", "CMP-5012B", "CMP-5046B", "CMP-6003B", "CMP-6012Y", "CMP-6039A", "CMP-6044A", "CMP-6046B", "CMP-6013Y"]
+        },
+        {
+          "name": "Computing Science MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7000A", "CMP-7003B", "CMP-7004B", "CMP-7022B", "CMP-7023B", "CMP-7024Y", "CMP-7025A", "CMP-7026B", "CMP-7027X", "CMP-7038B", "CMP-7039B", "CMP-7039X", "CMP-7040B", "CMP-7044A"]
+        },
+        {
+          "name": "Cyber Security MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7027X", "CMP-7034A", "CMP-7037A", "CMP-7038B", "CMP-7039B", "CMP-7039X", "CMP-7044A", "CMP-7045B"]
+        },
+        {
+          "name": "Advanced Computer Science MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7016A", "CMP-7022B", "CMP-7023B", "CMP-7026B", "CMP-7034A", "CMP-7038B", "CMP-7039B", "CMP-7039X", "CMP-7040B", "CMP-7042B", "CMP-7044A", "CMP-7057A", "CMP-7058A", "CMP-7059B"]
+        },
+        {
+          "name": "Artificial Intelligence MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7039B", "CMP-7039X", "CMP-7044A", "CMP-7058A", "CMP-7059B", "CMP-7016A", "CMP-7022B", "CMP-7023B", "CMP-7026B", "CMP-7009A", "CMP-7010A"]
+        },
+        {
+          "name": "Data Science MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7039B", "CMP-7039X", "CMP-7044A", "CMP-7058A", "CMP-7059B", "CMP-7016A", "CMP-7022B", "CMP-7023B", "CMP-7026B", "CMP-7010A", "CMP-7025A", "CMP-7025B"]
+        },
+        {
+          "name": "Computing MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7003B", "CMP-7046X", "CMP-7047B", "CMP-7044A", "CMP-7058A", "CMP-7057A", "CMP-7034A", "CMP-7025B"]
+        },
+        {
+          "name": "Cyber Security with Artificial Intelligence MSc",
+          "studyLevel": "Postgraduate",
+          "moduleCodes": ["CMP-7046X", "CMP-7047B", "CMP-7044A", "CMP-7045B", "CMP-7037A", "CMP-7038B", "CMP-7058A"]
+        }
+      ]
+    }
+  ],
+  "modules": {
+    "CMP-3002A": "FOUNDATIONS OF COMPUTING",
+    "CMP-3005A": "INTRODUCTORY PROGRAMMING",
+    "CMP-3006B": "INTRODUCTION TO DATA ANALYSIS",
+    "CMP-3007B": "INTRODUCTION TO SYSTEMS DESIGN",
+    "CMP-4002B": "COMPUTING PRINCIPLES",
+    "CMP-4004B": "MATHEMATICS FOR COMPUTING A",
+    "CMP-4005B": "MATHEMATICS FOR COMPUTING B",
+    "CMP-4008A": "PROGRAMMING 1",
+    "CMP-4009B": "PROGRAMMING FOR APPLICATIONS",
+    "CMP-4010B": "DATABASE SYSTEMS",
+    "CMP-4011A": "WEB-BASED PROGRAMMING",
+    "CMP-4013A": "SYSTEMS DEVELOPMENT",
+    "CMP-5003B": "SYSTEMS ANALYSIS",
+    "CMP-5010B": "COMPUTER GRAPHICS",
+    "CMP-5012B": "SOFTWARE ENGINEERING",
+    "CMP-5013A": "ARCHITECTURES AND OPERATING SYSTEMS",
+    "CMP-5014B": "DATA STRUCTURES AND ALGORITHMS",
+    "CMP-5015A": "PROGRAMMING 2",
+    "CMP-5027A": "ANALOGUE AND DIGITAL ELECTRONICS",
+    "CMP-5037B": "NETWORKS",
+    "CMP-5046B": "FOUNDATIONS OF DATA SCIENCE",
+    "CMP-5047A": "INTRODUCTION TO CYBER SECURITY",
+    "CMP-5049Y": "YEAR IN INDUSTRY",
+    "CMP-5058A": "ARTIFICIAL INTELLIGENCE",
+    "CMP-6003B": "SYSTEMS ENGINEERING",
+    "CMP-6012Y": "BUSINESS INFORMATION SYSTEMS PROJECT",
+    "CMP-6013Y": "COMPUTING PROJECT",
+    "CMP-6026A": "AUDIOVISUAL PROCESSING",
+    "CMP-6035B": "COMPUTER VISION",
+    "CMP-6039A": "HUMAN COMPUTER INTERACTION",
+    "CMP-6044A": "INTRODUCTION TO CYBER SECURITY",
+    "CMP-6045B": "DEVELOPING SECURE SOFTWARE",
+    "CMP-6046B": "UBIQUITOUS COMPUTING",
+    "CMP-6048A": "ADVANCED PROGRAMMING",
+    "CMP-6055Y": "YEAR ABROAD",
+    "CMP-6056B": "GAME AND MOBILE APP DEVELOPMENT",
+    "CMP-6057A": "ADVANCED WEB DEVELOPMENT",
+    "CMP-6058A": "ARTIFICIAL INTELLIGENCE",
+    "CMP-6059B": "ADVANCED ARTIFICIAL INTELLIGENCE",
+    "CMP-7000A": "APPLICATIONS PROGRAMMING",
+    "CMP-7003B": "WEB DEVELOPMENT",
+    "CMP-7004B": "SYSTEMS ENGINEERING ISSUES",
+    "CMP-7009A": "ADVANCED PROGRAMMING",
+    "CMP-7010A": "INTRODUCTION TO PYTHON FOR DATA SCIENCE",
+    "CMP-7016A": "AUDIO AND VISUAL PROCESSING",
+    "CMP-7022B": "INFORMATION VISUALISATION",
+    "CMP-7023B": "DATA MINING",
+    "CMP-7024Y": "MCOMP PROJECT",
+    "CMP-7025A": "DATABASE MANIPULATION",
+    "CMP-7025B": "DATABASE MANIPULATION",
+    "CMP-7026B": "COMPUTER VISION",
+    "CMP-7027X": "DISSERTATION",
+    "CMP-7034A": "INTRODUCTION TO CYBER SECURITY",
+    "CMP-7037A": "NETWORK SECURITY AND IOT",
+    "CMP-7038B": "DEVELOPING SECURE SOFTWARE",
+    "CMP-7039B": "DISSERTATION - P/T PROPOSAL",
+    "CMP-7039X": "DISSERTATION - P/T",
+    "CMP-7040B": "UBIQUITOUS COMPUTING",
+    "CMP-7042B": "GAME AND MOBILE APP DEVELOPMENT",
+    "CMP-7044A": "PROFESSIONAL SKILLS FOR COMPUTER SCIENTISTS",
+    "CMP-7045B": "CYBERCRIME AND DIGITAL INVESTIGATION",
+    "CMP-7046X": "MSc GROUP PROJECT",
+    "CMP-7047B": "PYTHON PROGRAMMING",
+    "CMP-7057A": "ADVANCED WEB DEVELOPMENT",
+    "CMP-7058A": "ARTIFICIAL INTELLIGENCE",
+    "CMP-7059B": "ADVANCED ARTIFICIAL INTELLIGENCE"
+  }
+}

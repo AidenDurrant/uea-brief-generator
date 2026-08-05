@@ -11,9 +11,37 @@ A static-exported Next.js prototype for creating assessment briefs, authenticati
 - **Local drafts:** Browser `localStorage`
 - **Saved assessments:** Supabase `assessments` table
 - **User identification:** Supabase `profiles` table with a user-provided display name
+- **User dashboard and login homepage:** `/`
+- **Assessment brief builder:** `/builder`
+- **Legacy dashboard redirect:** `/dashboard`
 - **Admin dashboard:** `/admin`
+- **Reviewer queue homepage:** `/reviews`
+- **Read-only review workspace:** `/review?assessment=ASSESSMENT_ID&category=REVIEW_CATEGORY`
 
 Only use synthetic assessment data until the university has approved the hosting, retention, and data-protection arrangements.
+
+## Authoring capabilities
+
+- Cascading School → Programme → Module selectors backed by `app/module-catalog.json`
+- GitHub-Flavoured Markdown, including native tables
+- Inline mathematics with `$...$` and block mathematics with `$$...$$`, rendered by KaTeX
+- UG grading matrices with a 40% pass threshold
+- PGT grading matrices with a 50% pass threshold
+- Optional module-specific weightings for co-taught assessments
+- Image attachments embedded in saved brief content
+
+KaTeX supports a broad, safe subset of LaTeX mathematics, but it is not a complete TeX distribution and does not load arbitrary LaTeX packages.
+
+### Maintaining the module catalogue
+
+`app/module-catalog.json` contains:
+
+- a reusable `modules` object keyed by module code;
+- a list of schools;
+- programmes within each school; and
+- the module codes available to each programme.
+
+To add a module, define its code and title once in `modules`, then add that code to each relevant programme's `moduleCodes` array. To add another school or programme, copy the existing JSON structure. The builder automatically updates the Programme and Module dropdowns from this file. Existing saved briefs with values that are not in the catalogue remain visible as labelled saved values rather than being discarded.
 
 ## 1. Install and run
 
@@ -36,25 +64,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
 
 The anonymous key is intended for browser use. Never expose the service-role key.
 
-## 3. Apply the database migrations
+## 3. Apply the v1.0 database schema
 
-For a new project, run these files in order in **Supabase → SQL Editor**:
+After resetting or creating the Supabase project, run the single schema file in
+**Supabase → SQL Editor**:
 
 ```text
 supabase/migrations/001_initial_schema.sql
-supabase/migrations/003_admin_user_management.sql
-supabase/migrations/004_admin_role_management.sql
 ```
 
-If the original migration was applied before user profiles were introduced, run `002` before `003`:
+This schema is the clean v1.0 baseline and is intended for an empty database. It
+contains the complete table, RLS, role, review workflow, audit, statistics and
+RPC setup; no earlier migration files are required.
 
-```text
-supabase/migrations/002_user_profiles.sql
-supabase/migrations/003_admin_user_management.sql
-supabase/migrations/004_admin_role_management.sql
-```
-
-The migrations create:
+The schema creates:
 
 - `assessments`
 - `profiles`
@@ -64,8 +87,14 @@ The migrations create:
 - profile policies
 - administrator read access
 - protected administrator statistics and user-management RPCs
+- shared reviewer-role pools, Cluster Lead scopes and review audit events
+- versioned approval, withdrawal and final-export RPCs
 
-Authenticated users may read display names so assessment ownership is understandable. Users may create and update only their own profile. They cannot change their own role in `admin_users`; the role-management RPCs explicitly verify that their caller is already an administrator.
+Authenticated users may read display names so assessment ownership is understandable. Users may create and update only their own profile. They cannot directly change Administrator or workflow-role membership; protected RPCs require either Administrator or Teaching Director oversight access.
+
+The initial schema deliberately creates no privileged user. Complete the first
+GitHub login and the one-time Administrator bootstrap in section 6 before
+configuring reviewer roles or submitting assessments for approval.
 
 ## 4. Configure GitHub OAuth
 
@@ -98,8 +127,16 @@ http://localhost:3000
 Additional redirect URLs:
 http://localhost:3000/
 http://localhost:3000/admin
+http://localhost:3000/builder
+http://localhost:3000/dashboard
+http://localhost:3000/reviews
+http://localhost:3000/review
 https://YOUR_USERNAME.github.io/uea-brief-generator/
 https://YOUR_USERNAME.github.io/uea-brief-generator/admin
+https://YOUR_USERNAME.github.io/uea-brief-generator/builder
+https://YOUR_USERNAME.github.io/uea-brief-generator/dashboard
+https://YOUR_USERNAME.github.io/uea-brief-generator/reviews
+https://YOUR_USERNAME.github.io/uea-brief-generator/review
 ```
 
 For the deployed prototype, the production GitHub Pages URL can be used as the Site URL after local testing.
@@ -110,9 +147,12 @@ After the first GitHub login, the application requires the user to choose a disp
 
 The GitHub account remains the authentication identity. Changing the display name does not alter the user's GitHub account.
 
-## 6. Create an administrator
+## 6. Bootstrap the first administrator
 
-First sign in through the application so Supabase creates the Auth user. Find the user UUID in **Authentication → Users**, then run:
+This one-time trusted step is mandatory on a fresh database. First sign in
+through the application so Supabase creates the Auth user and profile. Find the
+user UUID in **Authentication → Users**, then run this from the Supabase SQL
+Editor:
 
 ```sql
 insert into public.admin_users (user_id)
@@ -126,7 +166,21 @@ Administrators can then open:
 /admin
 ```
 
-Regular users see and modify only their own assessments. Administrators can read all assessment data, filter saved-variable statistics, review filtered deadlines in the calendar, see owners' chosen display names, and manage registered users as administrators or standard users.
+Do not add a public “first user becomes admin” flow; bootstrapping through the trusted SQL Editor avoids a race-to-admin vulnerability. After this first assignment, Administrators and Teaching Directors can manage access through the protected dashboard controls.
+
+Regular users see and modify only their own assessments. Administrators and Teaching Directors can read all assessment data, filter saved-variable statistics, review filtered deadlines in the calendar, see owners' chosen display names, and manage registered users and workflow roles.
+
+## Assessment approval workflow
+
+1. An MO/Instructor saves an assessment as a draft.
+2. Administrators and Teaching Directors manage shared reviewer pools. Cluster Leads review the Academic category for assessments matching their programme and level scopes. AI Suitability Reviewers and Employability Skills Reviewers have separate specialist queues.
+3. The owner uses **Submit for approval**, which is separate from saving. Submission requires at least one eligible non-owner reviewer in each required role pool.
+4. Every eligible role-holder can see the relevant work in `/reviews`; no individual reviewer is assigned to an assessment. They open the read-only `/review` workspace to approve or request changes. Approval comments are optional; withdrawal/change comments are mandatory.
+5. All three categories must approve the same assessment version before status becomes `approved`.
+6. Draft and incomplete-review exports contain a watermark. The owner receives a clean final export only after an atomic server-side approval check.
+7. Any saved brief edit after submission increments the version, invalidates all approvals, restores draft status and requires resubmission.
+
+One user may hold multiple reviewer roles, but an assessment owner can never review their own assessment. Administrator and Teaching Director are separate, traceable roles with the same oversight powers; neither adds a mandatory approval step. The admin dashboard retains the review-event audit trail. Programme and level scope mappings are stored in `cluster_lead_scopes`; assessments without this metadata cannot enter the academic review queue.
 
 ## 7. Configure GitHub Pages build values
 
@@ -145,6 +199,8 @@ The existing `.github/workflows/deploy.yml` passes these values into the static 
 - **Save New** inserts an assessment into Supabase.
 - **Update** updates the selected assessment.
 - The builder sidebar lists only the signed-in user's assessments.
+- Saving remains separate from submission for approval.
+- Review decisions and invalidated versions are retained in the workflow audit log.
 - Administrators access filtered statistics, assessment records, deadline calendars, and user role controls through `/admin`.
 - Uploaded images are currently stored inside the assessment JSON as data URLs. Move these to private object storage before production.
 
@@ -154,7 +210,7 @@ The existing `.github/workflows/deploy.yml` passes these values into the static 
 npm run build
 ```
 
-The static export generates both `/` and `/admin` for GitHub Pages.
+The static export generates `/`, `/builder`, `/dashboard`, `/admin`, `/reviews` and `/review` for GitHub Pages.
 
 ## Security boundaries
 
