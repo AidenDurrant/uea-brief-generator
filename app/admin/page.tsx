@@ -183,28 +183,39 @@ const parseContent = (content: Json): SavedBriefContent =>
   isRecord(content) ? (content as SavedBriefContent) : {};
 
 const getDeadlines = (assessment: Assessment): Deadline[] => {
-  const submissionDates = parseContent(assessment.content).formData
-    ?.submissionDates;
-  if (!Array.isArray(submissionDates)) return [];
+  const formData = parseContent(assessment.content).formData;
+  const firstLegacySubmission = Array.isArray(formData?.submissionDates)
+    ? formData.submissionDates[0]
+    : undefined;
+  const legacySubmission = isRecord(firstLegacySubmission)
+    ? firstLegacySubmission
+    : undefined;
+  const submissionDate =
+    typeof formData?.submissionDate === "string"
+      ? formData.submissionDate.trim()
+      : "";
+  const rawDate =
+    submissionDate ||
+    (typeof legacySubmission?.date === "string"
+      ? legacySubmission.date.trim()
+      : "");
+  if (!rawDate) return [];
 
-  return submissionDates.flatMap((item) => {
-    if (!isRecord(item) || typeof item.date !== "string" || !item.date) {
-      return [];
-    }
-    const date = new Date(item.date);
-    if (Number.isNaN(date.getTime())) return [];
-    return [
-      {
-        assessmentId: assessment.id,
-        assessmentTitle: assessment.title,
-        moduleCode: assessment.module_code,
-        ownerId: assessment.owner_id,
-        date,
-        description:
-          typeof item.description === "string" ? item.description : "",
-      },
-    ];
-  });
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return [];
+  return [
+    {
+      assessmentId: assessment.id,
+      assessmentTitle: assessment.title,
+      moduleCode: assessment.module_code,
+      ownerId: assessment.owner_id,
+      date,
+      description:
+        !submissionDate && typeof legacySubmission?.description === "string"
+          ? legacySubmission.description
+          : "",
+    },
+  ];
 };
 
 const dateKey = (date: Date) =>

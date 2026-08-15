@@ -215,6 +215,33 @@ const normaliseLoadedFormData = (
       : {};
   const merged = { ...defaults, ...source };
 
+  if (!source.checkedBy && typeof source.setBy === "string") {
+    const [setBy, ...checkedByParts] = source.setBy.split(" / ");
+    if (checkedByParts.length > 0) {
+      merged.setBy = setBy.trim();
+      merged.checkedBy = checkedByParts.join(" / ").trim();
+    }
+  }
+
+  if (!source.submissionDate && Array.isArray(source.submissionDates)) {
+    const firstSubmission = source.submissionDates[0];
+    if (typeof firstSubmission === "object" && firstSubmission !== null) {
+      merged.submissionDate = String(
+        (firstSubmission as Record<string, unknown>).date || "",
+      );
+    }
+  }
+
+  if (!source.returnDate && typeof source.returnOfFeedback === "string") {
+    const parsedReturnDate = new Date(source.returnOfFeedback);
+    if (!Number.isNaN(parsedReturnDate.getTime())) {
+      merged.returnDate = parsedReturnDate.toISOString().slice(0, 10);
+    }
+  }
+
+  delete merged.submissionDates;
+  delete merged.returnOfFeedback;
+
   if (!Object.prototype.hasOwnProperty.call(source, "academicYear")) {
     const legacyProgramme = String(source.programme || "");
     const legacyYear = legacyProgramme
@@ -372,9 +399,7 @@ const getDefaultState = () => {
     groupWorkPermitted: "No",
     groupSize: TEMPLATE.groupWorkDefault.size,
     groupMechanics: TEMPLATE.groupWorkDefault.mechanics,
-    submissionDates: [
-      { id: Date.now(), date: "2026-05-22T15:00", description: "Code/Report" },
-    ],
+    programme: "Computing Science BSc",
     aiPolicy: "RED",
     ...TEMPLATE.aiPolicyDefaults,
   };
@@ -885,8 +910,10 @@ export default function BriefGenerator() {
     setIsSaving(true);
     setPersistenceError(null);
 
-    const title = String(formData.module || "Untitled Assessment");
-    const moduleCode = title.split(/\s+/)[0] || "Unspecified";
+    const module = String(formData.module || "").trim();
+    const assessmentName = String(formData.assessmentName || "").trim();
+    const title = assessmentName || module || "Untitled Assessment";
+    const moduleCode = module.split(/\s+/)[0] || "Unspecified";
     const moduleLevelMatch = moduleCode.match(/\d/);
     const moduleLevel = moduleLevelMatch ? Number(moduleLevelMatch[0]) : null;
     const programme = String(formData.programme || "").trim() || null;
@@ -895,6 +922,8 @@ export default function BriefGenerator() {
       ? selectedAcademicYear
       : "Unspecified";
     const persistedFormData: Record<string, unknown> = { ...formData };
+    delete persistedFormData.submissionDates;
+    delete persistedFormData.returnOfFeedback;
 
     if (formData.groupWorkPermitted !== "Yes") {
       persistedFormData.groupSize = null;
@@ -1236,33 +1265,6 @@ export default function BriefGenerator() {
       ).filter((item) => item.id !== id),
     }));
 
-  const addSubmissionDate = () =>
-    setFormData((p) => ({
-      ...p,
-      submissionDates: [
-        ...(p.submissionDates || []),
-        { id: Date.now(), date: "", description: "" },
-      ],
-    }));
-  const updateSubmissionDate = (
-    id: number,
-    field: "date" | "description",
-    val: string,
-  ) =>
-    setFormData((p) => ({
-      ...p,
-      submissionDates: (p.submissionDates || []).map((d: any) =>
-        d.id === id ? { ...d, [field]: val } : d,
-      ),
-    }));
-  const removeSubmissionDate = (id: number) =>
-    setFormData((p) => ({
-      ...p,
-      submissionDates: (p.submissionDates || []).filter(
-        (d: any) => d.id !== id,
-      ),
-    }));
-
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldId: string,
@@ -1320,6 +1322,137 @@ export default function BriefGenerator() {
         target.selectionStart = target.selectionEnd = start + 1;
       }, 0);
     }
+  };
+
+  const renderContentEditorField = (fieldId: string, label: string) => {
+    const isVisible = sectionToggles[fieldId] !== false;
+
+    return (
+      <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+              {label}
+            </label>
+            <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
+              Add Image
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => handleImageUpload(event, fieldId)}
+              />
+            </label>
+          </div>
+          <VisibilityToggle
+            checked={isVisible}
+            onChange={() => toggleSection(fieldId)}
+          />
+        </div>
+        <textarea
+          className={`${INPUT} font-mono h-32 leading-relaxed resize-y ${isVisible ? "" : "opacity-60"}`}
+          value={(formData[fieldId] as string) || ""}
+          onChange={(event) => handleChange(fieldId, event.target.value)}
+          onKeyDown={(event) =>
+            handleTab(event, (value) => handleChange(fieldId, value))
+          }
+          aria-describedby={`${fieldId}-visibility-note`}
+        />
+        {!isVisible && (
+          <p
+            id={`${fieldId}-visibility-note`}
+            className="mt-2 text-[11px] text-slate-500"
+          >
+            This content remains editable but is currently hidden from the PDF.
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderSkillGroup = (category: "Transferable" | "Technical") => {
+    const skills = SKILLS_LIST.filter((skill) => skill.category === category);
+
+    return (
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            {category} Skills
+          </h3>
+          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">
+            {
+              skills.filter((skill) => selectedSkills.includes(skill.name))
+                .length
+            }{" "}
+            selected
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {skills.map((skill) => {
+            const selected = selectedSkills.includes(skill.name);
+            const expanded = expandedSkills.includes(skill.name);
+            const levels = skill.levels as Record<string, string[]>;
+
+            return (
+              <div
+                key={skill.name}
+                className={`overflow-hidden rounded-xl border transition-colors ${
+                  selected
+                    ? "border-indigo-300 bg-indigo-50"
+                    : "border-slate-200 bg-white"
+                } ${expanded ? "lg:col-span-2" : ""}`}
+              >
+                <div className="flex min-h-14 items-center">
+                  <label className="flex flex-1 cursor-pointer items-center gap-3 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleSkill(skill.name)}
+                      className="h-4 w-4 rounded accent-indigo-600"
+                    />
+                    <span className="text-xs font-semibold text-slate-800">
+                      {skill.name}
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleSkillExpand(skill.name)}
+                    className="self-stretch border-l border-slate-200 px-4 text-xs font-semibold text-slate-500 hover:bg-white/70 hover:text-indigo-600"
+                    aria-expanded={expanded}
+                  >
+                    {expanded ? "Hide" : "Details"}
+                  </button>
+                </div>
+                {expanded && (
+                  <div className="border-t border-slate-200 px-4 py-4">
+                    <p className="text-xs leading-5 text-slate-600">
+                      {skill.description}
+                    </p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {["3", "4", "5", "6"].map((level) => (
+                        <div
+                          key={level}
+                          className="rounded-lg border border-slate-200 bg-white p-3"
+                        >
+                          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+                            Level {level}
+                          </p>
+                          <ul className="list-disc space-y-1 pl-4 text-[11px] leading-4 text-slate-600">
+                            {(levels[level] || []).map((criterion) => (
+                              <li key={criterion}>{criterion}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const currentAssessment =
@@ -1589,7 +1722,7 @@ export default function BriefGenerator() {
           <AppHeader
             eyebrow="Assessment brief management"
             title="Assessment Builder"
-            subtitle={formData.module || formData.programme || "New brief"}
+            subtitle={formData.assessmentName || formData.module || "New brief"}
             sticky={false}
             maxWidthClass="max-w-none"
             className="editor-toolbar z-20"
@@ -1829,7 +1962,43 @@ export default function BriefGenerator() {
             <section className="ui-card">
               <SectionHeading step={1} title="Header Details" />
               <div className="flex flex-col space-y-5">
-                {/* Dynamic Headers from JSON */}
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+                  <FieldLabel>Programme filter</FieldLabel>
+                  <select
+                    className={INPUT}
+                    value={formData.programme || ""}
+                    onChange={(event) =>
+                      handleProgrammeChange(event.target.value)
+                    }
+                    disabled={availableProgrammes.length === 0}
+                  >
+                    {!selectedCatalogProgramme && formData.programme && (
+                      <option value={formData.programme}>
+                        {formData.programme} (saved value)
+                      </option>
+                    )}
+                    {["Undergraduate", "Postgraduate"].map((studyLevel) => {
+                      const programmes = availableProgrammes.filter(
+                        (programme) => programme.studyLevel === studyLevel,
+                      );
+                      return programmes.length > 0 ? (
+                        <optgroup key={studyLevel} label={studyLevel}>
+                          {programmes.map((programme) => (
+                            <option key={programme.name} value={programme.name}>
+                              {programme.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null;
+                    })}
+                  </select>
+                  <p className="mt-2 text-[11px] leading-5 text-indigo-700/80">
+                    Used to filter the module catalogue and route reviews; it is
+                    not shown in the assessment brief.
+                  </p>
+                </div>
+
+                {/* Official header fields from the template */}
                 {TEMPLATE.headerFields.map((field) => (
                   <div key={field.id}>
                     <FieldLabel>{field.label}</FieldLabel>
@@ -1851,38 +2020,6 @@ export default function BriefGenerator() {
                             {school.name}
                           </option>
                         ))}
-                      </select>
-                    ) : field.id === "programme" ? (
-                      <select
-                        className={INPUT}
-                        value={formData.programme || ""}
-                        onChange={(event) =>
-                          handleProgrammeChange(event.target.value)
-                        }
-                        disabled={availableProgrammes.length === 0}
-                      >
-                        {!selectedCatalogProgramme && formData.programme && (
-                          <option value={formData.programme}>
-                            {formData.programme} (saved value)
-                          </option>
-                        )}
-                        {["Undergraduate", "Postgraduate"].map((studyLevel) => {
-                          const programmes = availableProgrammes.filter(
-                            (programme) => programme.studyLevel === studyLevel,
-                          );
-                          return programmes.length > 0 ? (
-                            <optgroup key={studyLevel} label={studyLevel}>
-                              {programmes.map((programme) => (
-                                <option
-                                  key={programme.name}
-                                  value={programme.name}
-                                >
-                                  {programme.name}
-                                </option>
-                              ))}
-                            </optgroup>
-                          ) : null;
-                        })}
                       </select>
                     ) : field.id === "module" ? (
                       <select
@@ -2051,699 +2188,107 @@ export default function BriefGenerator() {
                     </div>
                   )}
                 </div>
-
-                {/* Dynamic Submission Dates Field with Flex Wrap */}
-                <div className="pt-2 border-t border-slate-100">
-                  <FieldLabel>Submission / Exam Date(s)</FieldLabel>
-                  <div className="space-y-3">
-                    {formData.submissionDates?.map((item: any) => (
-                      <div key={item.id} className="flex flex-wrap gap-2">
-                        <input
-                          type="datetime-local"
-                          className={`${INPUT} flex-1 min-w-[200px] shrink-0 font-medium`}
-                          value={item.date || ""}
-                          onChange={(e) =>
-                            updateSubmissionDate(
-                              item.id,
-                              "date",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <div className="flex flex-1 min-w-[200px] gap-2">
-                          <input
-                            type="text"
-                            className={`${INPUT} flex-1`}
-                            value={item.description || ""}
-                            placeholder="Label (e.g. Code/Report)"
-                            onChange={(e) =>
-                              updateSubmissionDate(
-                                item.id,
-                                "description",
-                                e.target.value,
-                              )
-                            }
-                          />
-                          {formData.submissionDates.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeSubmissionDate(item.id)}
-                              className="shrink-0 px-3.5 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 bg-white hover:border-red-200 shadow-sm"
-                              title="Remove date"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addSubmissionDate}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors mt-1 inline-block"
-                    >
-                      + Add another date
-                    </button>
-                  </div>
-                </div>
               </div>
             </section>
 
-            {/* 2 — Assessment Type */}
+            {/* 2 — Overview & Learning Outcomes */}
             <section className="ui-card">
-              <SectionHeading step={2} title="Assessment Method" />
-              <div>
-                <FieldLabel>Type of Assessment</FieldLabel>
-                <select
-                  className={`${INPUT} font-semibold text-indigo-900 cursor-pointer mb-5`}
-                  value={formData.assessmentType || ""}
-                  onChange={(e) =>
-                    handleChange("assessmentType", e.target.value)
-                  }
-                >
-                  {ASSESSMENT_METHODS.map((a) => (
-                    <option key={a.method} value={a.method}>
-                      {a.method}
-                    </option>
-                  ))}
-                  <option value="Other">Other...</option>
-                </select>
-
-                {formData.assessmentType === "Other" ? (
-                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                    <div>
-                      <FieldLabel>Assessment Title</FieldLabel>
-                      <input
-                        type="text"
-                        className={INPUT}
-                        placeholder="e.g., Live Exhibition"
-                        value={formData.customAssessmentName || ""}
-                        onChange={(e) =>
-                          handleChange("customAssessmentName", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Description</FieldLabel>
-                      <textarea
-                        className={`${INPUT} h-24 resize-y`}
-                        placeholder="Describe the nature of this custom assessment..."
-                        value={formData.customAssessmentDesc || ""}
-                        onChange={(e) =>
-                          handleChange("customAssessmentDesc", e.target.value)
-                        }
-                        onKeyDown={(e) =>
-                          handleTab(e, (val) =>
-                            handleChange("customAssessmentDesc", val),
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200">
-                      <span
-                        className={`inline-block px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-md border shadow-sm w-fit ${
-                          currentAssessment.tier.includes("Tier A")
-                            ? "bg-green-100 text-green-800 border-green-300"
-                            : currentAssessment.tier.includes("Tier B")
-                              ? "bg-amber-100 text-amber-800 border-amber-300"
-                              : "bg-red-100 text-red-800 border-red-300"
-                        }`}
-                      >
-                        {currentAssessment.tier}
-                      </span>
-                      <span className="inline-block px-3.5 py-1.5 bg-white text-slate-600 border border-slate-200 text-[10px] font-extrabold uppercase tracking-widest rounded-md shadow-sm w-fit sm:text-right">
-                        Category: {currentAssessment.category}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                      {currentAssessment.desc}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* 3 — Policies & Skills */}
-            <section className="ui-card">
-              <SectionHeading step={3} title="Policies & Skills" />
-              <div className="mb-0">
-                <FieldLabel>Group Work</FieldLabel>
-                <div
-                  className="flex p-1 gap-1 rounded-xl"
-                  style={{ background: "#f1f5f9" }}
-                >
-                  {[
-                    ["No", "Individual Assignment"],
-                    ["Yes", "Group Work Permitted"],
-                  ].map(([val, display]) => {
-                    const active = formData.groupWorkPermitted === val;
-                    return (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => handleChange("groupWorkPermitted", val)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium rounded-lg select-none"
-                        style={{
-                          transition: "all 0.2s",
-                          background: active ? "#4f46e5" : "transparent",
-                          color: active ? "#fff" : "#94a3b8",
-                          boxShadow: active
-                            ? "0 1px 4px rgba(79,70,229,0.35)"
-                            : "none",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!active) e.currentTarget.style.color = "#475569";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!active) e.currentTarget.style.color = "#94a3b8";
-                        }}
-                      >
-                        {active && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="11"
-                            height="11"
-                            className="shrink-0"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                        {display}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Group Mechanics appears directly beneath the group-work selector */}
-              {formData.groupWorkPermitted === "Yes" && (
-                <div className="mt-5 p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
-                        Group Mechanics
-                      </label>
-                      <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1 shadow-sm">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="10"
-                          height="10"
-                          className="shrink-0"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect
-                            x="3"
-                            y="3"
-                            width="18"
-                            height="18"
-                            rx="2"
-                            ry="2"
-                          ></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                        Add Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) =>
-                            handleImageUpload(e, "groupMechanics")
-                          }
-                        />
-                      </label>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
-                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                        Target Group Size:
-                      </label>
-                      <select
-                        className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer border-indigo-200`}
-                        value={formData.groupSize || ""}
-                        onChange={(e) =>
-                          handleChange("groupSize", e.target.value)
-                        }
-                      >
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="2-3">2-3</option>
-                        <option value="3-4">3-4</option>
-                        <option value="4-5">4-5</option>
-                        <option value="5-6">5-6</option>
-                        <option value="Variable">Variable</option>
-                      </select>
-                    </div>
-                    <textarea
-                      className={`${INPUT} font-mono h-28 leading-relaxed resize-y border-indigo-200 focus:border-indigo-500`}
-                      value={(formData.groupMechanics as string) || ""}
-                      onChange={(e) =>
-                        handleChange("groupMechanics", e.target.value)
-                      }
-                      onKeyDown={(e) =>
-                        handleTab(e, (val) =>
-                          handleChange("groupMechanics", val),
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div
-                style={{
-                  borderTop: "1px solid #f1f5f9",
-                  marginTop: 28,
-                  paddingTop: 28,
-                }}
-              >
-                <div className="flex items-end justify-between mb-3">
-                  <FieldLabel>Employability Skills Assessed</FieldLabel>
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-md mb-1.5 border border-indigo-100/50">
-                    {selectedSkills.length} Selected
-                  </span>
-                </div>
-
-                <div
-                  className="max-h-[600px] overflow-y-auto border border-slate-200 rounded-2xl bg-slate-50/50 p-3 shadow-inner"
-                  style={{ scrollbarWidth: "thin" }}
-                >
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {SKILLS_LIST.map((skillItem: any) => {
-                      const skillName =
-                        typeof skillItem === "string"
-                          ? skillItem
-                          : skillItem.name;
-                      const skillDesc =
-                        typeof skillItem === "string"
-                          ? ""
-                          : skillItem.description;
-                      const on = selectedSkills.includes(skillName);
-                      const isExpanded = expandedSkills.includes(skillName);
-
-                      return (
-                        <div
-                          key={skillName}
-                          className={`flex flex-col transition-all duration-300 border rounded-xl overflow-hidden ${
-                            isExpanded ? "col-span-1 lg:col-span-2" : ""
-                          } ${
-                            on
-                              ? "bg-indigo-50 border-indigo-300 shadow-md shadow-indigo-100/50"
-                              : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full h-14">
-                            <label className="flex items-center gap-3 pl-4 py-3 cursor-pointer flex-1 h-full">
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                onChange={() => toggleSkill(skillName)}
-                                className="w-4 h-4 cursor-pointer accent-indigo-600 transition-all"
-                              />
-                              <span
-                                className={`text-[12px] font-extrabold uppercase tracking-widest ${on ? "text-indigo-900" : "text-slate-700"}`}
-                              >
-                                {skillName}
-                              </span>
-                            </label>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleSkillExpand(skillName)}
-                              className={`h-full px-4 flex items-center justify-center transition-colors border-l ${
-                                on
-                                  ? "border-indigo-200 hover:bg-indigo-100/50 text-indigo-500"
-                                  : "border-slate-100 hover:bg-slate-50 text-slate-400"
-                              }`}
-                              title={
-                                isExpanded ? "Hide Details" : "Show Details"
-                              }
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                              </svg>
-                            </button>
-                          </div>
-
-                          {/* Expanded Level Rubric Box */}
-                          {isExpanded && (
-                            <div
-                              className={`px-4 pb-4 border-t ${on ? "border-indigo-200/60" : "border-slate-100"} cursor-default`}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {skillDesc && (
-                                <p
-                                  className={`text-[13px] mt-3 font-medium leading-relaxed ${on ? "text-indigo-800" : "text-slate-500"}`}
-                                >
-                                  {skillDesc}
-                                </p>
-                              )}
-
-                              {skillItem.levels && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
-                                  {["3", "4", "5", "6"].map((lvl) => {
-                                    const criteria = skillItem.levels[lvl];
-                                    if (!criteria || criteria.length === 0)
-                                      return null;
-                                    return (
-                                      <div
-                                        key={lvl}
-                                        className={`rounded-lg p-3 shadow-sm flex flex-col ${on ? "bg-white/60 border border-indigo-100/50" : "bg-slate-50 border border-slate-200/60"}`}
-                                      >
-                                        <div
-                                          className={`text-[10px] font-bold mb-2 uppercase tracking-wider border-b pb-1.5 ${on ? "text-indigo-500 border-indigo-100/50" : "text-slate-500 border-slate-200"}`}
-                                        >
-                                          Level {lvl}
-                                        </div>
-                                        <ul className="list-disc pl-4 m-0 space-y-1.5">
-                                          {criteria.map(
-                                            (c: string, idx: number) => (
-                                              <li
-                                                key={idx}
-                                                className={`text-[11px] leading-snug ${on ? "text-slate-700" : "text-slate-600"}`}
-                                              >
-                                                {c}
-                                              </li>
-                                            ),
-                                          )}
-                                        </ul>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* 4 — AI Policy */}
-            <section className="ui-card">
-              <SectionHeading step={4} title="Generative AI Policy" />
-              <div className="ai-policy-grid grid grid-cols-3 gap-4 mb-7">
-                {AI_OPTIONS.map((opt) => {
-                  const on = formData.aiPolicy === opt.value;
-                  const s = AI_CARD_STATES[opt.value];
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handleChange("aiPolicy", opt.value)}
-                      className="flex flex-col items-center gap-1.5 py-4 px-3 rounded-xl cursor-pointer select-none text-center relative"
-                      style={{
-                        transition: "all 0.15s",
-                        border: on
-                          ? `2px solid ${s.border}`
-                          : "2px solid #e2e8f0",
-                        background: on ? s.bg : "#fff",
-                        boxShadow: on ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!on) {
-                          e.currentTarget.style.borderColor = "#c7d2fe";
-                          e.currentTarget.style.background = "#fafafa";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!on) {
-                          e.currentTarget.style.borderColor = "#e2e8f0";
-                          e.currentTarget.style.background = "#fff";
-                        }
-                      }}
-                    >
-                      <span style={{ fontSize: 24, lineHeight: 1 }}>
-                        {opt.emoji}
-                      </span>
-                      <span
-                        className="text-xs font-bold uppercase tracking-widest mt-0.5"
-                        style={{ color: on ? s.labelColor : "#374151" }}
-                      >
-                        {opt.label}
-                      </span>
-                      <span
-                        className="text-xs leading-tight"
-                        style={{ color: on ? s.labelColor : "#9ca3af" }}
-                      >
-                        {opt.desc}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {formData.aiPolicy === "AMBER" && (
-                <div className="space-y-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
-                  {[
-                    { label: "Permitted Uses", field: "aiAmberPermitted" },
-                    { label: "Prohibited Uses", field: "aiAmberProhibited" },
-                  ].map(({ label, field }) => (
-                    <div key={field}>
-                      <label className="block text-xs font-bold text-amber-700 uppercase tracking-wide mb-1.5">
-                        {label}
-                      </label>
-                      <textarea
-                        className="w-full max-w-full box-border bg-white border border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
-                        value={
-                          (formData[
-                            field as keyof typeof formData
-                          ] as string) || ""
-                        }
-                        onChange={(e) => handleChange(field, e.target.value)}
-                        onKeyDown={(e) =>
-                          handleTab(e, (val) => handleChange(field, val))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-              {formData.aiPolicy === "GREEN" && (
-                <div className="p-4 rounded-xl bg-green-50 border border-green-200">
-                  <label className="block text-xs font-bold text-green-700 uppercase tracking-wide mb-1.5">
-                    Permitted Uses
-                  </label>
-                  <textarea
-                    className="w-full max-w-full box-border bg-white border border-green-200 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
-                    value={formData.aiGreenPermitted || ""}
-                    onChange={(e) =>
-                      handleChange("aiGreenPermitted", e.target.value)
-                    }
-                    onKeyDown={(e) =>
-                      handleTab(e, (val) =>
-                        handleChange("aiGreenPermitted", val),
-                      )
-                    }
-                  />
-                </div>
-              )}
-            </section>
-
-            {/* 5 — Content Specifications (Dynamic from JSON) */}
-            <section className="ui-card overflow-hidden box-border">
-              <SectionHeading step={5} title="Content Specifications" />
+              <SectionHeading step={2} title="Overview & Learning Outcomes" />
               <details className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
                 <summary className="cursor-pointer font-semibold text-slate-700">
                   Formatting help: tables, Markdown and LaTeX
                 </summary>
+                <p className="mt-2 leading-5">
+                  These editors support Markdown tables, images, and inline or
+                  block LaTeX mathematics.
+                </p>
                 <div className="mt-3 grid gap-3 leading-5 lg:grid-cols-2">
                   <div>
                     <p className="font-semibold text-slate-700">
                       Markdown table
                     </p>
-                    <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-[10px] text-slate-100">{`| Item | Value |\n| --- | --- |\n| Duration | 2 hours |`}</pre>
+                    <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-[10px] text-slate-100">{`| Item | Value |
+| --- | --- |
+| Duration | 2 hours |`}</pre>
                   </div>
                   <div>
                     <p className="font-semibold text-slate-700">
                       LaTeX mathematics
                     </p>
-                    <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-[10px] text-slate-100">{`Inline: $O(n \\log n)$\n\nBlock:\n$$\n\\sum_{i=1}^{n} x_i\n$$`}</pre>
+                    <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-[10px] text-slate-100">{`Inline: $O(n \\log n)$
+
+Block:
+$$
+\\sum_{i=1}^{n} x_i
+$$`}</pre>
                   </div>
                 </div>
               </details>
-              <div className="space-y-4 max-w-full">
-                {/* Loop through JSON content sections (excluding Eval block) */}
-                {TEMPLATE.contentSections
-                  .filter((f) => f.pdfGroup !== "Evaluation & Grading")
-                  .map((f) => {
-                    const isVisible = sectionToggles[f.id];
-                    return (
-                      <div
-                        key={f.id}
-                        className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
-                      >
-                        <div
-                          className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                              {f.label}
-                            </label>
-                            {isVisible && (
-                              <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="10"
-                                  height="10"
-                                  className="shrink-0"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <rect
-                                    x="3"
-                                    y="3"
-                                    width="18"
-                                    height="18"
-                                    rx="2"
-                                    ry="2"
-                                  ></rect>
-                                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                  <polyline points="21 15 16 10 5 21"></polyline>
-                                </svg>
-                                Add Image
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => handleImageUpload(e, f.id)}
-                                />
-                              </label>
-                            )}
-                          </div>
-                          <VisibilityToggle
-                            checked={!!isVisible}
-                            onChange={() => toggleSection(f.id)}
-                          />
-                        </div>
-                        {isVisible && (
-                          <textarea
-                            className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
-                            value={(formData[f.id] as string) || ""}
-                            onChange={(e) => handleChange(f.id, e.target.value)}
-                            onKeyDown={(e) =>
-                              handleTab(e, (val) => handleChange(f.id, val))
-                            }
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+              <div className="space-y-4">
+                {renderContentEditorField(
+                  "contextScenario",
+                  "Context & Scenario",
+                )}
+                {renderContentEditorField(
+                  "learningOutcomes",
+                  "Learning Outcomes Assessed",
+                )}
               </div>
             </section>
 
-            {/* 6 — Evaluation Matrix */}
+            {/* 3 — Employability Skills */}
+            <section className="ui-card">
+              <SectionHeading step={3} title="Employability Skills" />
+              <div className="space-y-8">
+                {renderSkillGroup("Transferable")}
+                {renderSkillGroup("Technical")}
+              </div>
+            </section>
+
+            {/* 4 — Task Specification */}
+            <section className="ui-card">
+              <SectionHeading step={4} title="Task Specification" />
+              <div className="space-y-4">
+                {renderContentEditorField(
+                  "coreObjectives",
+                  "Task Spec / Core Objectives",
+                )}
+                {renderContentEditorField(
+                  "architectureConstraints",
+                  "Architecture & Technical Constraints",
+                )}
+              </div>
+            </section>
+
+            {/* 5 — Deliverables */}
+            <section className="ui-card">
+              <SectionHeading step={5} title="Deliverables" />
+              <div className="space-y-4">
+                {renderContentEditorField("deliverables", "Deliverables")}
+                {renderContentEditorField(
+                  "submissionInstructions",
+                  "Submission Instructions",
+                )}
+              </div>
+            </section>
+
+            {/* 6 — Resources & Contact */}
+            <section className="ui-card">
+              <SectionHeading step={6} title="Resources & Contact" />
+              <div className="space-y-4">
+                {renderContentEditorField(
+                  "resourcesHints",
+                  "Resources & Hints",
+                )}
+                {renderContentEditorField("contactInfo", "Contact Information")}
+              </div>
+            </section>
+
+            {/* 7 — Evaluation & Grading */}
             <section className="ui-card max-w-full overflow-hidden box-border">
-              <SectionHeading step={6} title="Evaluation & Grading" />
+              <SectionHeading step={7} title="Evaluation & Grading" />
               <div className="space-y-4 max-w-full">
-                {/* Loop through JSON content sections (specifically the Eval block) */}
-                {TEMPLATE.contentSections
-                  .filter((f) => f.pdfGroup === "Evaluation & Grading")
-                  .map((f) => {
-                    const isVisible = sectionToggles[f.id];
-                    return (
-                      <div
-                        key={f.id}
-                        className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border"
-                      >
-                        <div
-                          className={`flex flex-wrap items-center justify-between gap-2 ${isVisible ? "mb-4" : ""}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                              {f.label}
-                            </label>
-                            {isVisible && (
-                              <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="10"
-                                  height="10"
-                                  className="shrink-0"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <rect
-                                    x="3"
-                                    y="3"
-                                    width="18"
-                                    height="18"
-                                    rx="2"
-                                    ry="2"
-                                  ></rect>
-                                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                  <polyline points="21 15 16 10 5 21"></polyline>
-                                </svg>
-                                Add Image
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => handleImageUpload(e, f.id)}
-                                />
-                              </label>
-                            )}
-                          </div>
-                          <VisibilityToggle
-                            checked={!!isVisible}
-                            onChange={() => toggleSection(f.id)}
-                          />
-                        </div>
-                        {isVisible && (
-                          <textarea
-                            className={`${INPUT} font-mono h-28 leading-relaxed resize-y`}
-                            value={(formData[f.id] as string) || ""}
-                            onChange={(e) => handleChange(f.id, e.target.value)}
-                            onKeyDown={(e) =>
-                              handleTab(e, (val) => handleChange(f.id, val))
-                            }
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                {renderContentEditorField("markingScheme", "Marking Scheme")}
 
                 {/* The Matrix Builder */}
                 <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border">
@@ -2915,6 +2460,331 @@ export default function BriefGenerator() {
                 </div>
               </div>
             </section>
+            {/* 8 — Assessment Method */}
+            <section className="ui-card">
+              <SectionHeading step={8} title="Assessment Method" />
+              <div>
+                <FieldLabel>Type of Assessment</FieldLabel>
+                <select
+                  className={`${INPUT} font-semibold text-indigo-900 cursor-pointer mb-5`}
+                  value={formData.assessmentType || ""}
+                  onChange={(e) =>
+                    handleChange("assessmentType", e.target.value)
+                  }
+                >
+                  {ASSESSMENT_METHODS.map((a) => (
+                    <option key={a.method} value={a.method}>
+                      {a.method}
+                    </option>
+                  ))}
+                  <option value="Other">Other...</option>
+                </select>
+
+                {formData.assessmentType === "Other" ? (
+                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+                    <div>
+                      <FieldLabel>Assessment Title</FieldLabel>
+                      <input
+                        type="text"
+                        className={INPUT}
+                        placeholder="e.g., Live Exhibition"
+                        value={formData.customAssessmentName || ""}
+                        onChange={(e) =>
+                          handleChange("customAssessmentName", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Description</FieldLabel>
+                      <textarea
+                        className={`${INPUT} h-24 resize-y`}
+                        placeholder="Describe the nature of this custom assessment..."
+                        value={formData.customAssessmentDesc || ""}
+                        onChange={(e) =>
+                          handleChange("customAssessmentDesc", e.target.value)
+                        }
+                        onKeyDown={(e) =>
+                          handleTab(e, (val) =>
+                            handleChange("customAssessmentDesc", val),
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200">
+                      <span
+                        className={`inline-block px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-md border shadow-sm w-fit ${
+                          currentAssessment.tier.includes("Tier A")
+                            ? "bg-green-100 text-green-800 border-green-300"
+                            : currentAssessment.tier.includes("Tier B")
+                              ? "bg-amber-100 text-amber-800 border-amber-300"
+                              : "bg-red-100 text-red-800 border-red-300"
+                        }`}
+                      >
+                        {currentAssessment.tier}
+                      </span>
+                      <span className="inline-block px-3.5 py-1.5 bg-white text-slate-600 border border-slate-200 text-[10px] font-extrabold uppercase tracking-widest rounded-md shadow-sm w-fit sm:text-right">
+                        Category: {currentAssessment.category}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                      {currentAssessment.desc}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* 9 — Group Work & Academic Integrity */}
+            <section className="ui-card">
+              <SectionHeading
+                step={9}
+                title="Group Work & Academic Integrity"
+              />
+              <div className="mb-0">
+                <FieldLabel>Group Work</FieldLabel>
+                <div
+                  className="flex p-1 gap-1 rounded-xl"
+                  style={{ background: "#f1f5f9" }}
+                >
+                  {[
+                    ["No", "Individual Assignment"],
+                    ["Yes", "Group Work Permitted"],
+                  ].map(([val, display]) => {
+                    const active = formData.groupWorkPermitted === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => handleChange("groupWorkPermitted", val)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium rounded-lg select-none"
+                        style={{
+                          transition: "all 0.2s",
+                          background: active ? "#4f46e5" : "transparent",
+                          color: active ? "#fff" : "#94a3b8",
+                          boxShadow: active
+                            ? "0 1px 4px rgba(79,70,229,0.35)"
+                            : "none",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!active) e.currentTarget.style.color = "#475569";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!active) e.currentTarget.style.color = "#94a3b8";
+                        }}
+                      >
+                        {active && (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="11"
+                            height="11"
+                            className="shrink-0"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )}
+                        {display}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Group Mechanics appears directly beneath the group-work selector */}
+              {formData.groupWorkPermitted === "Yes" && (
+                <div className="mt-5 p-5 rounded-2xl border border-indigo-200 bg-indigo-50 shadow-sm max-w-full overflow-hidden box-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                        Group Mechanics
+                      </label>
+                      <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded transition-all duration-200 px-2 py-1 bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-1 shadow-sm">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="10"
+                          height="10"
+                          className="shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect
+                            x="3"
+                            y="3"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          ></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleImageUpload(e, "groupMechanics")
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 border-b border-indigo-200 pb-4">
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Target Group Size:
+                      </label>
+                      <select
+                        className={`${INPUT} w-40 py-1.5 px-3 font-medium cursor-pointer border-indigo-200`}
+                        value={formData.groupSize || ""}
+                        onChange={(e) =>
+                          handleChange("groupSize", e.target.value)
+                        }
+                      >
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="2-3">2-3</option>
+                        <option value="3-4">3-4</option>
+                        <option value="4-5">4-5</option>
+                        <option value="5-6">5-6</option>
+                        <option value="Variable">Variable</option>
+                      </select>
+                    </div>
+                    <textarea
+                      className={`${INPUT} font-mono h-28 leading-relaxed resize-y border-indigo-200 focus:border-indigo-500`}
+                      value={(formData.groupMechanics as string) || ""}
+                      onChange={(e) =>
+                        handleChange("groupMechanics", e.target.value)
+                      }
+                      onKeyDown={(e) =>
+                        handleTab(e, (val) =>
+                          handleChange("groupMechanics", val),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* 10 — Generative AI Policy */}
+            <section className="ui-card">
+              <SectionHeading step={10} title="Generative AI Policy" />
+              <div className="ai-policy-grid grid grid-cols-3 gap-4 mb-7">
+                {AI_OPTIONS.map((opt) => {
+                  const on = formData.aiPolicy === opt.value;
+                  const s = AI_CARD_STATES[opt.value];
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handleChange("aiPolicy", opt.value)}
+                      className="flex flex-col items-center gap-1.5 py-4 px-3 rounded-xl cursor-pointer select-none text-center relative"
+                      style={{
+                        transition: "all 0.15s",
+                        border: on
+                          ? `2px solid ${s.border}`
+                          : "2px solid #e2e8f0",
+                        background: on ? s.bg : "#fff",
+                        boxShadow: on ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!on) {
+                          e.currentTarget.style.borderColor = "#c7d2fe";
+                          e.currentTarget.style.background = "#fafafa";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!on) {
+                          e.currentTarget.style.borderColor = "#e2e8f0";
+                          e.currentTarget.style.background = "#fff";
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: 24, lineHeight: 1 }}>
+                        {opt.emoji}
+                      </span>
+                      <span
+                        className="text-xs font-bold uppercase tracking-widest mt-0.5"
+                        style={{ color: on ? s.labelColor : "#374151" }}
+                      >
+                        {opt.label}
+                      </span>
+                      <span
+                        className="text-xs leading-tight"
+                        style={{ color: on ? s.labelColor : "#9ca3af" }}
+                      >
+                        {opt.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {formData.aiPolicy === "AMBER" && (
+                <div className="space-y-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                  {[
+                    { label: "Permitted Uses", field: "aiAmberPermitted" },
+                    { label: "Prohibited Uses", field: "aiAmberProhibited" },
+                  ].map(({ label, field }) => (
+                    <div key={field}>
+                      <label className="block text-xs font-bold text-amber-700 uppercase tracking-wide mb-1.5">
+                        {label}
+                      </label>
+                      <textarea
+                        className="w-full max-w-full box-border bg-white border border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
+                        value={
+                          (formData[
+                            field as keyof typeof formData
+                          ] as string) || ""
+                        }
+                        onChange={(e) => handleChange(field, e.target.value)}
+                        onKeyDown={(e) =>
+                          handleTab(e, (val) => handleChange(field, val))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {formData.aiPolicy === "GREEN" && (
+                <div className="p-4 rounded-xl bg-green-50 border border-green-200">
+                  <label className="block text-xs font-bold text-green-700 uppercase tracking-wide mb-1.5">
+                    Permitted Uses
+                  </label>
+                  <textarea
+                    className="w-full max-w-full box-border bg-white border border-green-200 focus:border-green-500 focus:ring-4 focus:ring-green-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
+                    value={formData.aiGreenPermitted || ""}
+                    onChange={(e) =>
+                      handleChange("aiGreenPermitted", e.target.value)
+                    }
+                    onKeyDown={(e) =>
+                      handleTab(e, (val) =>
+                        handleChange("aiGreenPermitted", val),
+                      )
+                    }
+                  />
+                </div>
+              )}
+            </section>
           </div>
         </div>
 
@@ -3050,9 +2920,6 @@ export default function BriefGenerator() {
                   <h2 className="text-[1.2rem] font-semibold mt-2">
                     {formData.school}
                   </h2>
-                  <h3 className="text-[1.1rem] mt-2 text-gray-700 italic">
-                    {formData.programme}
-                  </h3>
                 </div>
 
                 {/* Details table (Dynamically mapped from JSON) */}
@@ -3071,7 +2938,9 @@ export default function BriefGenerator() {
                           <td className="py-2.5 px-4">
                             {field.type === "date"
                               ? formatDateOnly(formData[field.id] as string)
-                              : (formData[field.id] as string)}
+                              : field.type === "datetime-local"
+                                ? formatDateTime(formData[field.id] as string)
+                                : (formData[field.id] as string)}
                           </td>
                         </tr>
                       ))}
@@ -3092,36 +2961,6 @@ export default function BriefGenerator() {
                           </td>
                         </tr>
                       ))}
-                    <tr className="border-b border-black print:break-inside-avoid">
-                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                        Submission / Exam Date(s)
-                      </th>
-                      <td className="py-2.5 px-4">
-                        {formData.submissionDates?.map(
-                          (d: any, idx: number) => (
-                            <div key={idx} className={idx > 0 ? "mt-1" : ""}>
-                              {formatDateTime(d.date, d.description)}
-                            </div>
-                          ),
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-black print:break-inside-avoid">
-                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                        Submission Location
-                      </th>
-                      <td className="py-2.5 px-4">
-                        {formData.submissionLocation as string}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-black print:break-inside-avoid">
-                      <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                        Return of Feedback
-                      </th>
-                      <td className="py-2.5 px-4">
-                        {formData.returnOfFeedback as string}
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
 
@@ -3130,15 +2969,15 @@ export default function BriefGenerator() {
                   const sectionsInGroup = TEMPLATE.contentSections.filter(
                     (s) => s.pdfGroup === groupTitle,
                   );
-                  const isOverview =
-                    groupTitle === "Overview & Learning Outcomes";
+                  const isEmployability = groupTitle === "Employability Skills";
                   const isTaskSpec = groupTitle === "Task Specification";
                   const isEvalGroup = groupTitle === "Evaluation & Grading";
 
                   const hasVisibleDynamic = sectionsInGroup.some(
                     (s) => sectionToggles[s.id] && formData[s.id],
                   );
-                  const hasSkills = isOverview && selectedSkills.length > 0;
+                  const hasSkills =
+                    isEmployability && selectedSkills.length > 0;
                   const hasGroupWork =
                     isTaskSpec && formData.groupWorkPermitted === "Yes";
                   const hasGradingMatrix =
@@ -3198,11 +3037,30 @@ export default function BriefGenerator() {
                         );
                       })}
 
-                      {/* Special Injection for Skills at end of Overview */}
-                      {isOverview && hasSkills && (
-                        <div className="mb-3 mt-6 text-[11pt]">
-                          <strong>Employability Skills Assessed:</strong>{" "}
-                          {selectedSkills.join(", ")}
+                      {isEmployability && hasSkills && (
+                        <div className="space-y-4 text-[11pt]">
+                          {(["Technical", "Transferable"] as const).map(
+                            (category) => {
+                              const skills = SKILLS_LIST.filter(
+                                (skill) =>
+                                  skill.category === category &&
+                                  selectedSkills.includes(skill.name),
+                              );
+                              if (skills.length === 0) return null;
+                              return (
+                                <div key={category}>
+                                  <h4 className="mb-1 font-bold">
+                                    {category} Skills
+                                  </h4>
+                                  <p>
+                                    {skills
+                                      .map((skill) => skill.name)
+                                      .join(", ")}
+                                  </p>
+                                </div>
+                              );
+                            },
+                          )}
                         </div>
                       )}
 

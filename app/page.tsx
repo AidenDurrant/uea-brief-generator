@@ -73,19 +73,26 @@ function formatDate(value: string | Date | null | undefined, withTime = false) {
 function deadlinesFor(assessment: Assessment): Deadline[] {
   if (!isRecord(assessment.content)) return [];
   const formData = assessment.content.formData;
-  if (!isRecord(formData) || !Array.isArray(formData.submissionDates))
-    return [];
+  if (!isRecord(formData)) return [];
 
-  return formData.submissionDates
-    .flatMap((entry) => {
-      if (!isRecord(entry)) return [];
-      const rawDate = text(entry.date);
-      if (!rawDate) return [];
-      const date = new Date(rawDate);
-      if (Number.isNaN(date.getTime())) return [];
-      return [{ date, description: text(entry.description) }];
-    })
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const firstLegacySubmission = Array.isArray(formData.submissionDates)
+    ? formData.submissionDates[0]
+    : undefined;
+  const legacySubmission = isRecord(firstLegacySubmission)
+    ? firstLegacySubmission
+    : undefined;
+  const submissionDate = text(formData.submissionDate);
+  const rawDate = submissionDate || text(legacySubmission?.date);
+  if (!rawDate) return [];
+
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return [];
+  return [
+    {
+      date,
+      description: submissionDate ? "" : text(legacySubmission?.description),
+    },
+  ];
 }
 
 function nextDeadline(assessment: Assessment) {

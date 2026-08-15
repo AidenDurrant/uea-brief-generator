@@ -16,7 +16,6 @@ type QueueRow =
   Database["public"]["Functions"]["review_queue"]["Returns"][number];
 type AuthState = "loading" | "signed-out" | "authenticated";
 type JsonRecord = { [key: string]: Json | undefined };
-type SubmissionDate = { date: string; description: string };
 
 type AssessmentGroup = {
   assessmentId: string;
@@ -145,29 +144,53 @@ function AuthMessage({
   );
 }
 
-function BriefSummary({ content }: { content: Json }) {
+function BriefSummary({
+  content,
+  assessmentTitle,
+}: {
+  content: Json;
+  assessmentTitle?: string;
+}) {
   const root = isRecord(content) ? content : {};
   const formData = isRecord(root.formData) ? root.formData : {};
   const selectedSkills = Array.isArray(root.selectedSkills)
     ? root.selectedSkills.map((skill) => displayValue(skill)).filter(Boolean)
     : [];
-  const submissionDates: SubmissionDate[] = Array.isArray(
-    formData.submissionDates,
-  )
-    ? formData.submissionDates.flatMap((entry) => {
-        if (!isRecord(entry)) return [];
-        const date = displayValue(entry.date);
-        if (!date) return [];
-        return [{ date, description: displayValue(entry.description) }];
-      })
-    : [];
+  const firstLegacySubmission = Array.isArray(formData.submissionDates)
+    ? formData.submissionDates[0]
+    : undefined;
+  const legacySubmission = isRecord(firstLegacySubmission)
+    ? firstLegacySubmission
+    : undefined;
+  const submissionDate =
+    displayValue(formData.submissionDate) ||
+    displayValue(legacySubmission?.date);
+  const returnDate =
+    displayValue(formData.returnDate) ||
+    displayValue(formData.returnOfFeedback);
 
   const facts = [
-    ["Programme", displayValue(formData.programme)],
+    [
+      "Assessment Name",
+      displayValue(formData.assessmentName) ||
+        assessmentTitle ||
+        displayValue(formData.module),
+    ],
     ["Academic year", displayValue(formData.academicYear)],
     ["Assessment type", displayValue(formData.assessmentType)],
     ["AI policy", displayValue(formData.aiPolicy)],
     ["Group work", displayValue(formData.groupWorkPermitted)],
+    ["Set By", displayValue(formData.setBy)],
+    ["Checked By", displayValue(formData.checkedBy)],
+    [
+      "Release Date",
+      displayValue(formData.releaseDate)
+        ? formatDate(displayValue(formData.releaseDate))
+        : "",
+    ],
+    ["Submission Date", submissionDate ? formatDate(submissionDate, true) : ""],
+    ["Submission Location", displayValue(formData.submissionLocation)],
+    ["Feedback Return Date", returnDate ? formatDate(returnDate) : ""],
   ].filter((fact): fact is [string, string] => Boolean(fact[1]));
 
   const sections = [
@@ -208,54 +231,29 @@ function BriefSummary({ content }: { content: Json }) {
         ))}
       </div>
 
-      {(selectedSkills.length > 0 || submissionDates.length > 0) && (
+      {selectedSkills.length > 0 && (
         <div className="grid gap-5 border-t border-slate-200 pt-5 lg:grid-cols-2">
-          {selectedSkills.length > 0 && (
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                Selected employability skills
-              </h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedSkills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-          {submissionDates.length > 0 && (
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                Submission dates
-              </h3>
-              <ul className="mt-2 space-y-2">
-                {submissionDates.map((submission, index) => (
-                  <li
-                    key={`${submission.date}-${index}`}
-                    className="flex flex-wrap justify-between gap-x-4 gap-y-1 rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm"
-                  >
-                    <span className="font-semibold text-slate-900">
-                      {submission.description || `Submission ${index + 1}`}
-                    </span>
-                    <time className="text-slate-600">
-                      {formatDate(submission.date, true)}
-                    </time>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+              Selected employability skills
+            </h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </section>
         </div>
       )}
 
       {facts.length === 0 &&
         sections.length === 0 &&
-        selectedSkills.length === 0 &&
-        submissionDates.length === 0 && (
+        selectedSkills.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
             No brief summary fields are available for this assessment version.
           </p>

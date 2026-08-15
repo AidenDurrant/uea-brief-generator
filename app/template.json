@@ -9,12 +9,7 @@
       "default": "School of Computing Sciences",
       "type": "select"
     },
-    {
-      "id": "programme",
-      "label": "Programme",
-      "default": "Computing Science BSc",
-      "type": "select"
-    },
+
     {
       "id": "academicYear",
       "label": "Academic Year",
@@ -28,6 +23,12 @@
       "type": "select"
     },
     {
+      "id": "assessmentName",
+      "label": "Assessment Name",
+      "default": "Coursework 1",
+      "type": "text"
+    },
+    {
       "id": "weighting",
       "label": "Weighting",
       "default": "40%",
@@ -35,8 +36,14 @@
     },
     {
       "id": "setBy",
-      "label": "Set / Checked By",
-      "default": "Assessment Setter / Second Marker",
+      "label": "Set By",
+      "default": "First lecturer",
+      "type": "text"
+    },
+    {
+      "id": "checkedBy",
+      "label": "Checked By",
+      "default": "Second lecturer",
       "type": "text"
     },
     {
@@ -46,16 +53,22 @@
       "type": "date"
     },
     {
+      "id": "submissionDate",
+      "label": "Submission Date",
+      "default": "2026-05-22T15:00",
+      "type": "datetime-local"
+    },
+    {
       "id": "submissionLocation",
       "label": "Submission Location",
       "default": "Blackboard / GitHub Classroom",
       "type": "text"
     },
     {
-      "id": "returnOfFeedback",
-      "label": "Return of Feedback",
-      "default": "Within 20 working days",
-      "type": "text"
+      "id": "returnDate",
+      "label": "Feedback Return Date",
+      "default": "2026-06-19",
+      "type": "date"
     }
   ],
   "aiPolicyDefaults": {
@@ -69,6 +82,7 @@
   },
   "pdfGroupOrder": [
     "Overview & Learning Outcomes",
+    "Employability Skills",
     "Task Specification",
     "Deliverables",
     "Resources & Contact",

@@ -500,9 +500,14 @@ export default function ReviewPage() {
   const coTaughtModules = Array.isArray(formData.coTaughtModules)
     ? formData.coTaughtModules.filter(isRecord)
     : [];
-  const submissionDates = Array.isArray(formData.submissionDates)
-    ? formData.submissionDates.filter(isRecord)
-    : [];
+  const firstLegacySubmission = Array.isArray(formData.submissionDates)
+    ? formData.submissionDates[0]
+    : undefined;
+  const legacySubmission = isRecord(firstLegacySubmission)
+    ? firstLegacySubmission
+    : undefined;
+  const submissionDate =
+    text(formData.submissionDate) || text(legacySubmission?.date);
   const rubricRows = Array.isArray(root.rubricRows)
     ? root.rubricRows.filter(isRecord)
     : [];
@@ -779,8 +784,12 @@ export default function ReviewPage() {
               <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <ReadOnlyValue label="School" value={text(formData.school)} />
                 <ReadOnlyValue
-                  label="Programme"
-                  value={text(formData.programme)}
+                  label="Assessment Name"
+                  value={
+                    text(formData.assessmentName) ||
+                    assessment.title ||
+                    text(formData.module)
+                  }
                 />
                 <ReadOnlyValue
                   label="Academic year"
@@ -795,50 +804,31 @@ export default function ReviewPage() {
                   label="Weighting"
                   value={text(formData.weighting)}
                 />
+                <ReadOnlyValue label="Set By" value={text(formData.setBy)} />
                 <ReadOnlyValue
-                  label="Set / checked by"
-                  value={text(formData.setBy)}
+                  label="Checked By"
+                  value={text(formData.checkedBy)}
                 />
                 <ReadOnlyValue
-                  label="Release date"
+                  label="Release Date"
                   value={formatDate(text(formData.releaseDate))}
                 />
                 <ReadOnlyValue
-                  label="Submission location"
+                  label="Submission Date"
+                  value={formatDate(submissionDate, true)}
+                />
+                <ReadOnlyValue
+                  label="Submission Location"
                   value={text(formData.submissionLocation)}
                 />
                 <ReadOnlyValue
-                  label="Return of feedback"
-                  value={text(formData.returnOfFeedback)}
+                  label="Feedback Return Date"
+                  value={formatDate(
+                    text(formData.returnDate) ||
+                      text(formData.returnOfFeedback),
+                  )}
                 />
               </dl>
-
-              <div className="mt-5 border-t border-slate-100 pt-5">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Submission / exam dates
-                </h3>
-                {submissionDates.length > 0 ? (
-                  <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {submissionDates.map((entry, index) => (
-                      <li
-                        key={`${text(entry.date)}-${index}`}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm"
-                      >
-                        <p className="font-semibold text-slate-800">
-                          {text(entry.description) || `Submission ${index + 1}`}
-                        </p>
-                        <time className="mt-1 block text-xs text-slate-500">
-                          {formatDate(text(entry.date), true)}
-                        </time>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2 text-sm italic text-slate-400">
-                    No submission dates recorded.
-                  </p>
-                )}
-              </div>
 
               {coTaughtModules.length > 0 && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
