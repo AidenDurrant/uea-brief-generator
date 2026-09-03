@@ -10,16 +10,30 @@ import TEMPLATE from "../template.json";
 import MODULE_CATALOG from "../module-catalog.json";
 import { AppHeader } from "@/app/components/app-header";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { Assessment, Database, Json } from "@/lib/database.types";
+import type {
+  Assessment,
+  Database,
+  Json,
+  Profile,
+} from "@/lib/database.types";
 import type { User } from "@supabase/supabase-js";
 
 // ─── Constants & Extracted Text ───────────────────────────────────────────────
 const DRAFT_STORAGE_KEY = "uea_brief_draft_v2";
 
+type RubricRow = Record<string, any> & { id: number };
+
+// A co-taught module can optionally carry its own marking scheme and/or grading
+// matrix when the same brief is assessed differently on each module.
 type CoTaughtModule = {
   id: number;
   module: string;
   weighting: string;
+  markingSchemeEnabled?: boolean;
+  markingScheme?: string;
+  gradingMatrixEnabled?: boolean;
+  gradingScheme?: string;
+  rubricRows?: RubricRow[];
 };
 
 type ReviewStatusRow =
@@ -164,11 +178,36 @@ const PGT_GRADE_BANDS = [
   },
 ];
 
+const gradeBandsFor = (scheme?: string) =>
+  scheme === "PGT" ? PGT_GRADE_BANDS : UG_GRADE_BANDS;
+
+const createRubricRow = (): RubricRow => ({
+  id: Date.now(),
+  component: "New Component",
+  weight: "10%",
+  fail: "",
+  pass: "",
+  twoTwo: "",
+  twoOne: "",
+  first: "",
+  excelled: "",
+});
+
 const AI_OPTIONS = [
   { value: "RED", emoji: "🔴", label: "RED", desc: "No AI Permitted" },
   { value: "AMBER", emoji: "🟡", label: "AMBER", desc: "Restricted Use" },
   { value: "GREEN", emoji: "🟢", label: "GREEN", desc: "Full Integration" },
 ];
+
+// Approval runs setter -> checker -> cluster lead, in that order.
+const WORKFLOW_STAGES = [
+  { id: "checker", label: "Checker", shortLabel: "Checker" },
+  { id: "cluster_lead", label: "Cluster lead", shortLabel: "Cluster lead" },
+] as const;
+
+const stageLabel = (stage: string) =>
+  WORKFLOW_STAGES.find((item) => item.id === stage)?.label ??
+  stage.replaceAll("_", " ");
 
 const ACADEMIC_YEAR_OPTIONS = ["2025-2026", "2026-2027", "2027-2028"];
 type ModuleCode = keyof typeof MODULE_CATALOG.modules;
@@ -465,6 +504,8 @@ export default function BriefGenerator() {
     boolean | null
   >(null);
   const [reviewStatuses, setReviewStatuses] = useState<ReviewStatusRow[]>([]);
+  const [checkerId, setCheckerId] = useState<string>("");
+  const [checkerCandidates, setCheckerCandidates] = useState<Profile[]>([]);
   const [workflowMessage, setWorkflowMessage] = useState<string | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
 
@@ -491,14 +532,26 @@ export default function BriefGenerator() {
     (programme) => programme.name === String(formData.programme || ""),
   );
   const availableModuleCodes = selectedCatalogProgramme?.moduleCodes ?? [];
-  const gradeBands =
-    formData.gradingScheme === "PGT" ? PGT_GRADE_BANDS : UG_GRADE_BANDS;
+  const gradeBands = gradeBandsFor(formData.gradingScheme);
+  const coTaughtModules = (formData.coTaughtModules ||
+    []) as CoTaughtModule[];
+  const activeCoTaughtModules = formData.coTaughtWeightingsEnabled
+    ? coTaughtModules
+    : [];
+  const coTaughtMarkingSchemes = activeCoTaughtModules.filter(
+    (item) =>
+      item.markingSchemeEnabled && String(item.markingScheme || "").trim(),
+  );
+  const coTaughtGradingMatrices = activeCoTaughtModules.filter(
+    (item) => item.gradingMatrixEnabled && (item.rubricRows || []).length > 0,
+  );
   const currentEditorSignature = JSON.stringify({
     formData,
     sectionToggles,
     selectedSkills,
     rubricRows,
     uploadedImages,
+    checkerId,
   });
   const currentSavedAssessment = briefsList.find(
     (brief) => brief.id === currentBriefId,
@@ -527,6 +580,23 @@ export default function BriefGenerator() {
       setBriefsList(data ?? []);
     }
     setIsBriefsLoading(false);
+  }, []);
+
+  // Any registered user other than the setter can be nominated as the checker.
+  const refreshCheckerCandidates = useCallback(async (ownerId: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .neq("user_id", ownerId)
+      .order("display_name", { ascending: true });
+
+    if (error) {
+      setPersistenceError(error.message);
+      setCheckerCandidates([]);
+      return;
+    }
+    setCheckerCandidates(data ?? []);
   }, []);
 
   const refreshReviewStatus = useCallback(async (assessmentId: string) => {
@@ -611,6 +681,7 @@ export default function BriefGenerator() {
           parsed.rubricRows?.length ? parsed.rubricRows : defaults.rubricRows,
         );
         setUploadedImages(parsed.uploadedImages || defaults.uploadedImages);
+        setCheckerId(parsed.checkerId || "");
         setCurrentBriefId(parsed.currentBriefId || null);
       } catch (error) {
         console.error("Failed to parse draft:", error);
@@ -635,6 +706,7 @@ export default function BriefGenerator() {
           refreshBriefs(user.id),
           refreshAdminStatus(user.id),
           refreshProfile(user),
+          refreshCheckerCandidates(user.id),
         ]);
       }
     };
@@ -651,9 +723,11 @@ export default function BriefGenerator() {
           void refreshBriefs(user.id);
           void refreshAdminStatus(user.id);
           void refreshProfile(user);
+          void refreshCheckerCandidates(user.id);
         }, 0);
       } else {
         setBriefsList([]);
+        setCheckerCandidates([]);
         setCurrentBriefId(null);
         setProfileName("");
         setPendingDisplayName("");
@@ -663,7 +737,12 @@ export default function BriefGenerator() {
     });
 
     return () => subscription.unsubscribe();
-  }, [refreshAdminStatus, refreshBriefs, refreshProfile]);
+  }, [
+    refreshAdminStatus,
+    refreshBriefs,
+    refreshCheckerCandidates,
+    refreshProfile,
+  ]);
 
   // Auto-save draft
   useEffect(() => {
@@ -674,6 +753,7 @@ export default function BriefGenerator() {
       selectedSkills,
       rubricRows,
       uploadedImages,
+      checkerId,
       currentBriefId,
     };
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -683,6 +763,7 @@ export default function BriefGenerator() {
     selectedSkills,
     rubricRows,
     uploadedImages,
+    checkerId,
     currentBriefId,
     isClient,
   ]);
@@ -726,6 +807,7 @@ export default function BriefGenerator() {
       ? content.rubricRows
       : defaults.rubricRows;
     const loadedImages = content.uploadedImages || defaults.uploadedImages;
+    const loadedCheckerId = brief.checker_id || "";
 
     hasHandledBriefLink.current = true;
     setFormData(loadedFormData);
@@ -733,6 +815,7 @@ export default function BriefGenerator() {
     setSelectedSkills(loadedSkills);
     setRubricRows(loadedRubrics);
     setUploadedImages(loadedImages);
+    setCheckerId(loadedCheckerId);
     setCurrentBriefId(brief.id);
     setExportApprovalOverride(null);
     setSavedSignature(
@@ -742,6 +825,7 @@ export default function BriefGenerator() {
         selectedSkills: loadedSkills,
         rubricRows: loadedRubrics,
         uploadedImages: loadedImages,
+        checkerId: loadedCheckerId,
       }),
     );
     void refreshReviewStatus(brief.id);
@@ -784,6 +868,7 @@ export default function BriefGenerator() {
     setExpandedSkills([]);
     setRubricRows(defaults.rubricRows);
     setUploadedImages(defaults.uploadedImages);
+    setCheckerId("");
     setCurrentBriefId(null);
     setSavedSignature("");
     setExportApprovalOverride(null);
@@ -856,6 +941,7 @@ export default function BriefGenerator() {
       ? content.rubricRows
       : defaults.rubricRows;
     const loadedImages = content.uploadedImages || defaults.uploadedImages;
+    const loadedCheckerId = brief.checker_id || "";
 
     setFormData(loadedFormData);
     setSectionToggles(loadedSectionToggles);
@@ -863,6 +949,7 @@ export default function BriefGenerator() {
     setExpandedSkills([]);
     setRubricRows(loadedRubrics);
     setUploadedImages(loadedImages);
+    setCheckerId(loadedCheckerId);
     setCurrentBriefId(brief.id);
     setExportApprovalOverride(null);
     setSavedSignature(
@@ -872,6 +959,7 @@ export default function BriefGenerator() {
         selectedSkills: loadedSkills,
         rubricRows: loadedRubrics,
         uploadedImages: loadedImages,
+        checkerId: loadedCheckerId,
       }),
     );
     setWorkflowMessage(null);
@@ -938,6 +1026,24 @@ export default function BriefGenerator() {
 
     if (!formData.coTaughtWeightingsEnabled) {
       persistedFormData.coTaughtModules = null;
+    } else {
+      persistedFormData.coTaughtModules = coTaughtModules.map((item) => {
+        const keepMatrix =
+          !!item.gradingMatrixEnabled && !!sectionToggles.gradingMatrix;
+        return {
+          ...item,
+          markingScheme: item.markingSchemeEnabled
+            ? item.markingScheme || null
+            : null,
+          rubricRows: keepMatrix
+            ? (item.rubricRows || []).map((row) =>
+                (item.gradingScheme || formData.gradingScheme) === "PGT"
+                  ? { ...row, pass: null }
+                  : row,
+              )
+            : null,
+        };
+      });
     }
 
     if (formData.assessmentType !== "Other") {
@@ -992,6 +1098,7 @@ export default function BriefGenerator() {
       assessment_type: String(formData.assessmentType || "Unspecified"),
       ai_policy: String(formData.aiPolicy || "Unspecified"),
       group_work_permitted: formData.groupWorkPermitted === "Yes",
+      checker_id: checkerId || null,
       content,
     };
 
@@ -1019,7 +1126,7 @@ export default function BriefGenerator() {
     setSavedSignature(currentEditorSignature);
     setWorkflowMessage(
       data.status === "draft"
-        ? "Draft saved. Submit it separately when the required reviewer role pools are available."
+        ? "Draft saved. Nominate a checker, then submit it for approval."
         : "Assessment saved.",
     );
     await Promise.all([
@@ -1056,7 +1163,9 @@ export default function BriefGenerator() {
       return;
     }
 
-    setWorkflowMessage("Submitted for all three required reviews.");
+    setWorkflowMessage(
+      "Submitted to your checker. It passes to the cluster lead once they approve.",
+    );
     await Promise.all([
       refreshBriefs(currentUser.id),
       refreshReviewStatus(currentBriefId),
@@ -1169,21 +1278,7 @@ export default function BriefGenerator() {
     );
   };
 
-  const addRubricRow = () =>
-    setRubricRows([
-      ...rubricRows,
-      {
-        id: Date.now(),
-        component: "New Component",
-        weight: "10%",
-        fail: "",
-        pass: "",
-        twoTwo: "",
-        twoOne: "",
-        first: "",
-        excelled: "",
-      },
-    ]);
+  const addRubricRow = () => setRubricRows([...rubricRows, createRubricRow()]);
   const updateRubricRow = (id: number, field: string, value: string) =>
     setRubricRows(
       rubricRows.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
@@ -1248,14 +1343,13 @@ export default function BriefGenerator() {
     }));
   const updateCoTaughtModule = (
     id: number,
-    field: "module" | "weighting",
-    value: string,
+    patch: Partial<CoTaughtModule>,
   ) =>
     setFormData((current) => ({
       ...current,
       coTaughtModules: (
         (current.coTaughtModules || []) as CoTaughtModule[]
-      ).map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+      ).map((item) => (item.id === id ? { ...item, ...patch } : item)),
     }));
   const removeCoTaughtModule = (id: number) =>
     setFormData((current) => ({
@@ -1265,9 +1359,62 @@ export default function BriefGenerator() {
       ).filter((item) => item.id !== id),
     }));
 
+  // Per-module marking scheme / grading matrix overrides.
+  const toggleCoTaughtMarkingScheme = (id: number) => {
+    const item = coTaughtModules.find((entry) => entry.id === id);
+    if (!item) return;
+    updateCoTaughtModule(id, {
+      markingSchemeEnabled: !item.markingSchemeEnabled,
+    });
+  };
+
+  const toggleCoTaughtGradingMatrix = (id: number) => {
+    const item = coTaughtModules.find((entry) => entry.id === id);
+    if (!item) return;
+    const enabled = !item.gradingMatrixEnabled;
+    updateCoTaughtModule(id, {
+      gradingMatrixEnabled: enabled,
+      gradingScheme: item.gradingScheme || String(formData.gradingScheme || "UG"),
+      rubricRows: enabled && !item.rubricRows?.length
+        ? rubricRows.map((row, index) => ({ ...row, id: Date.now() + index }))
+        : item.rubricRows,
+    });
+  };
+
+  const addCoTaughtRubricRow = (id: number) => {
+    const item = coTaughtModules.find((entry) => entry.id === id);
+    if (!item) return;
+    updateCoTaughtModule(id, {
+      rubricRows: [...(item.rubricRows || []), createRubricRow()],
+    });
+  };
+
+  const updateCoTaughtRubricRow = (
+    id: number,
+    rowId: number,
+    field: string,
+    value: string,
+  ) => {
+    const item = coTaughtModules.find((entry) => entry.id === id);
+    if (!item) return;
+    updateCoTaughtModule(id, {
+      rubricRows: (item.rubricRows || []).map((row) =>
+        row.id === rowId ? { ...row, [field]: value } : row,
+      ),
+    });
+  };
+
+  const removeCoTaughtRubricRow = (id: number, rowId: number) => {
+    const item = coTaughtModules.find((entry) => entry.id === id);
+    if (!item) return;
+    updateCoTaughtModule(id, {
+      rubricRows: (item.rubricRows || []).filter((row) => row.id !== rowId),
+    });
+  };
+
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    fieldId: string,
+    target: string | ((markdown: string) => void),
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1293,12 +1440,15 @@ export default function BriefGenerator() {
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
         const imgId = "img-" + Date.now();
         setUploadedImages((prev) => ({ ...prev, [imgId]: dataUrl }));
-        setFormData((prev) => ({
-          ...prev,
-          [fieldId]:
-            (prev[fieldId] || "") +
-            `\n\n![Image | 100% | center](attachment:${imgId})\n`,
-        }));
+        const markdown = `\n\n![Image | 100% | center](attachment:${imgId})\n`;
+        if (typeof target === "function") {
+          target(markdown);
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            [target]: (prev[target] || "") + markdown,
+          }));
+        }
       };
       img.src = event.target?.result as string;
     };
@@ -1369,6 +1519,196 @@ export default function BriefGenerator() {
       </div>
     );
   };
+
+  const renderRubricEditor = (
+    rows: RubricRow[],
+    bands: typeof UG_GRADE_BANDS,
+    handlers: {
+      update: (rowId: number, field: string, value: string) => void;
+      remove: (rowId: number) => void;
+      add: () => void;
+    },
+  ) => (
+    <>
+      {rows.map((row) => (
+        <div
+          key={row.id}
+          className="rounded-xl border border-slate-200 overflow-hidden box-border max-w-full shadow-sm"
+        >
+          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              Component Row
+            </span>
+            <button
+              type="button"
+              onClick={() => handlers.remove(row.id)}
+              className="text-[10px] font-extrabold uppercase tracking-wider rounded-md px-3 py-1.5 transition-all"
+              style={{
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                color: "#64748b",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#fca5a5";
+                e.currentTarget.style.color = "#dc2626";
+                e.currentTarget.style.background = "#fef2f2";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#e2e8f0";
+                e.currentTarget.style.color = "#64748b";
+                e.currentTarget.style.background = "#fff";
+              }}
+            >
+              ✕ Remove
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end px-5 py-4 bg-slate-50 border-b border-slate-100 max-w-full box-border">
+            <div className="flex-1 min-w-0 w-full">
+              <FieldLabel>Component Name</FieldLabel>
+              <input
+                type="text"
+                className={INPUT}
+                value={row.component || ""}
+                onChange={(e) =>
+                  handlers.update(row.id, "component", e.target.value)
+                }
+              />
+            </div>
+            <div className="w-full sm:w-32 shrink-0">
+              <FieldLabel>Weight</FieldLabel>
+              <input
+                type="text"
+                className={`${INPUT} text-center`}
+                value={row.weight || ""}
+                onChange={(e) =>
+                  handlers.update(row.id, "weight", e.target.value)
+                }
+              />
+            </div>
+          </div>
+          <div className="rubric-grade-grid grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 max-w-full box-border">
+            {bands.map((g) => (
+              <div key={g.key} className="max-w-full box-border">
+                <div
+                  className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border mb-1.5 ${g.pill}`}
+                >
+                  <span>{g.label}</span>
+                  <span className="opacity-70 font-medium normal-case">
+                    {g.range}
+                  </span>
+                </div>
+                <textarea
+                  className="w-full max-w-full box-border bg-white border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 px-3 py-2 rounded-lg text-xs h-24 outline-none resize-none text-slate-700 transition-all"
+                  value={(row[g.key] as string) || ""}
+                  onChange={(e) =>
+                    handlers.update(row.id, g.key, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    handleTab(e, (val) => handlers.update(row.id, g.key, val))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={handlers.add}
+        className="w-full max-w-full box-border py-4 flex items-center justify-center gap-2 text-xs font-semibold rounded-xl"
+        style={{
+          border: "1.5px dashed #c7d2fe",
+          color: "#6366f1",
+          background: "transparent",
+          transition: "all 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#eef2ff";
+          e.currentTarget.style.borderColor = "#818cf8";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.borderColor = "#c7d2fe";
+        }}
+      >
+        + Add Component Row
+      </button>
+    </>
+  );
+
+  const renderGradingSchemeSelect = (
+    value: string,
+    onChange: (value: string) => void,
+  ) => (
+    <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div>
+        <p className="text-xs font-semibold text-slate-700">Grading framework</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          PGT assessments use a 50% pass threshold.
+        </p>
+      </div>
+      <select
+        className={`${INPUT} w-full sm:w-64`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="UG">Undergraduate (pass at 40%)</option>
+        <option value="PGT">Postgraduate taught (pass at 50%)</option>
+      </select>
+    </div>
+  );
+
+  const renderPdfRubricTable = (
+    rows: RubricRow[],
+    bands: typeof UG_GRADE_BANDS,
+  ) => (
+    <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
+      <thead className="break-inside-avoid print:break-inside-avoid">
+        <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
+          <th className="border-r border-black p-1.5 w-[14%]">Component</th>
+          <th className="border-r border-black p-1.5 w-[7%] text-[7pt]">
+            Weight
+          </th>
+          {bands.map((band, bandIndex) => (
+            <th
+              key={band.key}
+              className={`p-1.5 ${
+                bandIndex < bands.length - 1 ? "border-r border-black" : ""
+              }`}
+            >
+              {band.label} ({band.range})
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr
+            key={row.id}
+            className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
+          >
+            <td className="border-r border-black p-1.5 font-bold print-bg-gray-light bg-gray-50 break-words">
+              {row.component}
+            </td>
+            <td className="border-r border-black p-1.5 text-center font-bold print-bg-gray-light bg-gray-50">
+              {row.weight}
+            </td>
+            {bands.map((band, bandIndex) => (
+              <td
+                key={band.key}
+                className={`p-1.5 break-words ${
+                  bandIndex < bands.length - 1 ? "border-r border-black" : ""
+                }`}
+              >
+                {row[band.key]}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 
   const renderSkillGroup = (category: "Transferable" | "Technical") => {
     const skills = SKILLS_LIST.filter((skill) => skill.category === category);
@@ -1858,36 +2198,39 @@ export default function BriefGenerator() {
                   >
                     {currentSavedAssessment.status.replaceAll("_", " ")}
                   </span>
-                  {(["academic", "ai", "employability"] as const).map(
-                    (category) => {
-                      const review = reviewStatuses.find(
-                        (item) => item.category === category,
-                      );
-                      return (
-                        <span
-                          key={category}
-                          className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
-                            review?.state === "approved"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : review?.state === "changes_requested"
-                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                  {WORKFLOW_STAGES.map((stage) => {
+                    const review = reviewStatuses.find(
+                      (item) => item.stage === stage.id,
+                    );
+                    const isBlocked =
+                      review?.awaiting_previous_stage &&
+                      review.state !== "approved";
+                    return (
+                      <span
+                        key={stage.id}
+                        className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                          review?.state === "approved"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : review?.state === "changes_requested"
+                              ? "border-rose-200 bg-rose-50 text-rose-700"
+                              : isBlocked
+                                ? "border-slate-200 bg-slate-50 text-slate-500"
                                 : "border-amber-200 bg-amber-50 text-amber-700"
-                          }`}
-                          title={
-                            review?.reviewer_name ||
-                            "Awaiting an eligible role-holder"
-                          }
-                        >
-                          {category === "academic"
-                            ? "Academic"
-                            : category === "ai"
-                              ? "AI"
-                              : "Employability"}
-                          : {review?.state?.replaceAll("_", " ") || "pending"}
-                        </span>
-                      );
-                    },
-                  )}
+                        }`}
+                        title={
+                          review?.reviewer_name ||
+                          (stage.id === "checker"
+                            ? "No checker nominated yet"
+                            : "Awaiting a scoped cluster lead")
+                        }
+                      >
+                        {stage.shortLabel}:{" "}
+                        {review?.state === "pending" && isBlocked
+                          ? "waiting on checker"
+                          : review?.state?.replaceAll("_", " ") || "pending"}
+                      </span>
+                    );
+                  })}
                 </div>
                 <button
                   type="button"
@@ -1895,6 +2238,7 @@ export default function BriefGenerator() {
                   disabled={
                     isSubmittingForReview ||
                     hasUnsavedChanges ||
+                    !checkerId ||
                     currentSavedAssessment.status !== "draft"
                   }
                   className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1904,11 +2248,45 @@ export default function BriefGenerator() {
                     : hasUnsavedChanges
                       ? "Save before submitting"
                       : currentSavedAssessment.status === "draft"
-                        ? "Submit for approval"
+                        ? checkerId
+                          ? "Submit for approval"
+                          : "Select a checker first"
                         : currentSavedAssessment.status === "approved"
                           ? "Fully approved"
                           : "Review in progress"}
                 </button>
+              </div>
+
+              {/* Stage 1 of the workflow: the setter nominates their checker. */}
+              <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-3">
+                <div className="min-w-0 flex-1">
+                  <FieldLabel>
+                    Checker — reviews this brief before the cluster lead
+                  </FieldLabel>
+                  <select
+                    className={`${INPUT} sm:max-w-md`}
+                    value={checkerId}
+                    onChange={(event) => setCheckerId(event.target.value)}
+                    disabled={currentSavedAssessment.status !== "draft"}
+                  >
+                    <option value="">Select a registered user…</option>
+                    {checkerCandidates.map((candidate) => (
+                      <option
+                        key={candidate.user_id}
+                        value={candidate.user_id}
+                      >
+                        {candidate.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-500 sm:max-w-xs">
+                  {currentSavedAssessment.status === "draft"
+                    ? checkerCandidates.length === 0
+                      ? "No other registered users are available to check this brief yet."
+                      : "Save the brief after choosing, then submit for approval."
+                    : "The checker is fixed until the brief returns to draft."}
+                </p>
               </div>
               {reviewStatuses.some(
                 (review) =>
@@ -1922,11 +2300,11 @@ export default function BriefGenerator() {
                     )
                     .map((review) => (
                       <div
-                        key={review.category}
+                        key={review.stage}
                         className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"
                       >
-                        <p className="font-semibold capitalize">
-                          {review.category.replaceAll("_", " ")} review changes
+                        <p className="font-semibold">
+                          {stageLabel(review.stage)} requested changes
                         </p>
                         <p className="mt-1 whitespace-pre-wrap leading-5">
                           {review.comment}
@@ -2112,11 +2490,13 @@ export default function BriefGenerator() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold text-slate-700">
-                        Different weightings for co-taught modules
+                        Co-taught modules
                       </p>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        Add another module when the same brief has a different
-                        assessment weighting.
+                        Add another module when the same brief is assessed on
+                        more than one module. Each module can carry its own
+                        weighting, and its own marking scheme or grading matrix
+                        in step 7.
                       </p>
                     </div>
                     <button
@@ -2136,9 +2516,7 @@ export default function BriefGenerator() {
                   </div>
                   {formData.coTaughtWeightingsEnabled && (
                     <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
-                      {(
-                        (formData.coTaughtModules || []) as CoTaughtModule[]
-                      ).map((item) => (
+                      {coTaughtModules.map((item) => (
                         <div
                           key={item.id}
                           className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]"
@@ -2149,11 +2527,9 @@ export default function BriefGenerator() {
                             placeholder="Module code and title"
                             value={item.module}
                             onChange={(event) =>
-                              updateCoTaughtModule(
-                                item.id,
-                                "module",
-                                event.target.value,
-                              )
+                              updateCoTaughtModule(item.id, {
+                                module: event.target.value,
+                              })
                             }
                           />
                           <input
@@ -2162,11 +2538,9 @@ export default function BriefGenerator() {
                             placeholder="Weighting, e.g. 50%"
                             value={item.weighting}
                             onChange={(event) =>
-                              updateCoTaughtModule(
-                                item.id,
-                                "weighting",
-                                event.target.value,
-                              )
+                              updateCoTaughtModule(item.id, {
+                                weighting: event.target.value,
+                              })
                             }
                           />
                           <button
@@ -2306,158 +2680,190 @@ $$`}</pre>
 
                   {sectionToggles.gradingMatrix && (
                     <div className="space-y-5 max-w-full">
-                      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Grading framework
-                          </p>
-                          <p className="mt-1 text-[11px] text-slate-500">
-                            PGT assessments use a 50% pass threshold.
-                          </p>
-                        </div>
-                        <select
-                          className={`${INPUT} w-full sm:w-64`}
-                          value={formData.gradingScheme || "UG"}
-                          onChange={(event) =>
-                            handleChange("gradingScheme", event.target.value)
-                          }
-                        >
-                          <option value="UG">
-                            Undergraduate (pass at 40%)
-                          </option>
-                          <option value="PGT">
-                            Postgraduate taught (pass at 50%)
-                          </option>
-                        </select>
-                      </div>
-                      {rubricRows.map((row) => (
-                        <div
-                          key={row.id}
-                          className="rounded-xl border border-slate-200 overflow-hidden box-border max-w-full shadow-sm"
-                        >
-                          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                              Component Row
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeRubricRow(row.id)}
-                              className="text-[10px] font-extrabold uppercase tracking-wider rounded-md px-3 py-1.5 transition-all"
-                              style={{
-                                background: "#fff",
-                                border: "1px solid #e2e8f0",
-                                color: "#64748b",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = "#fca5a5";
-                                e.currentTarget.style.color = "#dc2626";
-                                e.currentTarget.style.background = "#fef2f2";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = "#e2e8f0";
-                                e.currentTarget.style.color = "#64748b";
-                                e.currentTarget.style.background = "#fff";
-                              }}
-                            >
-                              ✕ Remove
-                            </button>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end px-5 py-4 bg-slate-50 border-b border-slate-100 max-w-full box-border">
-                            <div className="flex-1 min-w-0 w-full">
-                              <FieldLabel>Component Name</FieldLabel>
-                              <input
-                                type="text"
-                                className={INPUT}
-                                value={row.component || ""}
-                                onChange={(e) =>
-                                  updateRubricRow(
-                                    row.id,
-                                    "component",
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </div>
-                            <div className="w-full sm:w-32 shrink-0">
-                              <FieldLabel>Weight</FieldLabel>
-                              <input
-                                type="text"
-                                className={`${INPUT} text-center`}
-                                value={row.weight || ""}
-                                onChange={(e) =>
-                                  updateRubricRow(
-                                    row.id,
-                                    "weight",
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className="rubric-grade-grid grid grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 max-w-full box-border">
-                            {gradeBands.map((g) => (
-                              <div
-                                key={g.key}
-                                className="max-w-full box-border"
-                              >
-                                <div
-                                  className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border mb-1.5 ${g.pill}`}
-                                >
-                                  <span>{g.label}</span>
-                                  <span className="opacity-70 font-medium normal-case">
-                                    {g.range}
-                                  </span>
-                                </div>
-                                <textarea
-                                  className="w-full max-w-full box-border bg-white border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 px-3 py-2 rounded-lg text-xs h-24 outline-none resize-none text-slate-700 transition-all"
-                                  value={
-                                    (row[
-                                      g.key as keyof typeof row
-                                    ] as string) || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateRubricRow(
-                                      row.id,
-                                      g.key,
-                                      e.target.value,
-                                    )
-                                  }
-                                  onKeyDown={(e) =>
-                                    handleTab(e, (val) =>
-                                      updateRubricRow(row.id, g.key, val),
-                                    )
-                                  }
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={addRubricRow}
-                        className="w-full max-w-full box-border py-4 flex items-center justify-center gap-2 text-xs font-semibold rounded-xl"
-                        style={{
-                          border: "1.5px dashed #c7d2fe",
-                          color: "#6366f1",
-                          background: "transparent",
-                          transition: "all 0.15s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#eef2ff";
-                          e.currentTarget.style.borderColor = "#818cf8";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "transparent";
-                          e.currentTarget.style.borderColor = "#c7d2fe";
-                        }}
-                      >
-                        + Add Component Row
-                      </button>
+                      {renderGradingSchemeSelect(
+                        String(formData.gradingScheme || "UG"),
+                        (value) => handleChange("gradingScheme", value),
+                      )}
+                      {renderRubricEditor(rubricRows, gradeBands, {
+                        update: updateRubricRow,
+                        remove: removeRubricRow,
+                        add: addRubricRow,
+                      })}
                     </div>
                   )}
                 </div>
+
+                {/* Per-module marking schemes and grading matrices */}
+                {formData.coTaughtWeightingsEnabled &&
+                  coTaughtModules.length > 0 && (
+                    <div className="space-y-4 max-w-full">
+                      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Co-taught module overrides
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Where a co-taught module is marked differently, add its
+                          own marking scheme or grading matrix. Anything left off
+                          falls back to the shared version above.
+                        </p>
+                      </div>
+
+                      {coTaughtModules.map((item, index) => {
+                        const moduleLabel =
+                          item.module || `Co-taught module ${index + 1}`;
+                        const moduleBands = gradeBandsFor(
+                          item.gradingScheme || String(formData.gradingScheme || "UG"),
+                        );
+                        const moduleRubricRows = item.rubricRows || [];
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm max-w-full overflow-hidden box-border space-y-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                {moduleLabel}
+                              </label>
+                              {item.weighting && (
+                                <span className="rounded-full bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+                                  {item.weighting}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Module-specific marking scheme */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-700">
+                                    Module-specific marking scheme
+                                  </p>
+                                  <p className="mt-1 text-[11px] text-slate-500">
+                                    Printed after the shared marking scheme,
+                                    under this module&apos;s heading.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleCoTaughtMarkingScheme(item.id)
+                                  }
+                                  aria-pressed={!!item.markingSchemeEnabled}
+                                  className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                                    item.markingSchemeEnabled
+                                      ? "bg-indigo-600 text-white"
+                                      : "border border-slate-300 bg-white text-slate-600"
+                                  }`}
+                                >
+                                  {item.markingSchemeEnabled ? "Added" : "Add"}
+                                </button>
+                              </div>
+                              {item.markingSchemeEnabled && (
+                                <div className="mt-4 border-t border-slate-100 pt-4">
+                                  <div className="mb-2 flex items-center gap-3">
+                                    <label className="cursor-pointer text-[9px] font-extrabold uppercase tracking-wider rounded px-2 py-1 bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 flex items-center gap-1 shadow-sm">
+                                      Add Image
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(event) =>
+                                          handleImageUpload(
+                                            event,
+                                            (markdown) =>
+                                              updateCoTaughtModule(item.id, {
+                                                markingScheme:
+                                                  (item.markingScheme || "") +
+                                                  markdown,
+                                              }),
+                                          )
+                                        }
+                                      />
+                                    </label>
+                                  </div>
+                                  <textarea
+                                    className={`${INPUT} font-mono h-32 leading-relaxed resize-y`}
+                                    value={item.markingScheme || ""}
+                                    onChange={(event) =>
+                                      updateCoTaughtModule(item.id, {
+                                        markingScheme: event.target.value,
+                                      })
+                                    }
+                                    onKeyDown={(event) =>
+                                      handleTab(event, (value) =>
+                                        updateCoTaughtModule(item.id, {
+                                          markingScheme: value,
+                                        }),
+                                      )
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Module-specific grading matrix */}
+                            <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-700">
+                                    Module-specific grading matrix
+                                  </p>
+                                  <p className="mt-1 text-[11px] text-slate-500">
+                                    Printed as an extra table for this module.
+                                    Starts as a copy of the shared matrix so you
+                                    only edit what differs.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleCoTaughtGradingMatrix(item.id)
+                                  }
+                                  aria-pressed={!!item.gradingMatrixEnabled}
+                                  className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                                    item.gradingMatrixEnabled
+                                      ? "bg-indigo-600 text-white"
+                                      : "border border-slate-300 bg-white text-slate-600"
+                                  }`}
+                                >
+                                  {item.gradingMatrixEnabled ? "Added" : "Add"}
+                                </button>
+                              </div>
+                              {item.gradingMatrixEnabled && (
+                                <div className="mt-4 space-y-5 border-t border-slate-100 pt-4 max-w-full">
+                                  {renderGradingSchemeSelect(
+                                    item.gradingScheme ||
+                                      String(formData.gradingScheme || "UG"),
+                                    (value) =>
+                                      updateCoTaughtModule(item.id, {
+                                        gradingScheme: value,
+                                      }),
+                                  )}
+                                  {renderRubricEditor(
+                                    moduleRubricRows,
+                                    moduleBands,
+                                    {
+                                      update: (rowId, field, value) =>
+                                        updateCoTaughtRubricRow(
+                                          item.id,
+                                          rowId,
+                                          field,
+                                          value,
+                                        ),
+                                      remove: (rowId) =>
+                                        removeCoTaughtRubricRow(item.id, rowId),
+                                      add: () => addCoTaughtRubricRow(item.id),
+                                    },
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
               </div>
             </section>
             {/* 8 — Assessment Method */}
@@ -2984,12 +3390,18 @@ $$`}</pre>
                     isEvalGroup &&
                     sectionToggles.gradingMatrix &&
                     rubricRows.length > 0;
+                  const hasModuleOverrides =
+                    isEvalGroup &&
+                    (coTaughtMarkingSchemes.length > 0 ||
+                      (sectionToggles.gradingMatrix &&
+                        coTaughtGradingMatrices.length > 0));
 
                   if (
                     !hasVisibleDynamic &&
                     !hasSkills &&
                     !hasGroupWork &&
-                    !hasGradingMatrix
+                    !hasGradingMatrix &&
+                    !hasModuleOverrides
                   )
                     return null;
 
@@ -3065,59 +3477,55 @@ $$`}</pre>
                       )}
 
                       {/* Special Injection for Grading Matrix at end of Evaluation block */}
-                      {hasGradingMatrix && (
-                        <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
-                          <thead className="break-inside-avoid print:break-inside-avoid">
-                            <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
-                              <th className="border-r border-black p-1.5 w-[14%]">
-                                Component
-                              </th>
-                              <th className="border-r border-black p-1.5 w-[7%] text-[7pt]">
-                                Weight
-                              </th>
-                              {gradeBands.map((band, bandIndex) => (
-                                <th
-                                  key={band.key}
-                                  className={`p-1.5 ${
-                                    bandIndex < gradeBands.length - 1
-                                      ? "border-r border-black"
-                                      : ""
-                                  }`}
-                                >
-                                  {band.label} ({band.range})
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rubricRows.map((row) => (
-                              <tr
-                                key={row.id}
-                                className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
-                              >
-                                <td className="border-r border-black p-1.5 font-bold print-bg-gray-light bg-gray-50 break-words">
-                                  {row.component}
-                                </td>
-                                <td className="border-r border-black p-1.5 text-center font-bold print-bg-gray-light bg-gray-50">
-                                  {row.weight}
-                                </td>
-                                {gradeBands.map((band, bandIndex) => (
-                                  <td
-                                    key={band.key}
-                                    className={`p-1.5 break-words ${
-                                      bandIndex < gradeBands.length - 1
-                                        ? "border-r border-black"
-                                        : ""
-                                    }`}
-                                  >
-                                    {row[band.key]}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
+                      {hasGradingMatrix &&
+                        renderPdfRubricTable(rubricRows, gradeBands)}
+
+                      {/* Per-module marking schemes and grading matrices */}
+                      {isEvalGroup &&
+                        activeCoTaughtModules.map((item, index) => {
+                          const moduleMarkingScheme =
+                            item.markingSchemeEnabled &&
+                            String(item.markingScheme || "").trim()
+                              ? String(item.markingScheme)
+                              : "";
+                          const moduleRubricRows =
+                            sectionToggles.gradingMatrix &&
+                            item.gradingMatrixEnabled
+                              ? item.rubricRows || []
+                              : [];
+
+                          if (!moduleMarkingScheme && moduleRubricRows.length === 0)
+                            return null;
+
+                          const moduleLabel =
+                            item.module || `Co-taught module ${index + 1}`;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="mt-6 break-inside-avoid print:break-inside-avoid"
+                            >
+                              <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
+                                {moduleLabel}
+                                {item.weighting ? ` — ${item.weighting}` : ""}
+                              </h4>
+                              {moduleMarkingScheme && (
+                                <MarkdownRenderer
+                                  content={moduleMarkingScheme}
+                                  images={uploadedImages}
+                                />
+                              )}
+                              {moduleRubricRows.length > 0 &&
+                                renderPdfRubricTable(
+                                  moduleRubricRows,
+                                  gradeBandsFor(
+                                    item.gradingScheme ||
+                                      String(formData.gradingScheme || "UG"),
+                                  ),
+                                )}
+                            </div>
+                          );
+                        })}
                     </div>
                   );
                 })}

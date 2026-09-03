@@ -15,6 +15,7 @@ export type Database = {
           ai_policy: string;
           approved_at: string | null;
           assessment_type: string;
+          checker_id: string | null;
           content: Json;
           created_at: string;
           group_work_permitted: boolean;
@@ -34,6 +35,7 @@ export type Database = {
           ai_policy: string;
           approved_at?: string | null;
           assessment_type: string;
+          checker_id?: string | null;
           content?: Json;
           created_at?: string;
           group_work_permitted?: boolean;
@@ -53,6 +55,7 @@ export type Database = {
           ai_policy?: string;
           approved_at?: string | null;
           assessment_type?: string;
+          checker_id?: string | null;
           content?: Json;
           created_at?: string;
           group_work_permitted?: boolean;
@@ -74,7 +77,7 @@ export type Database = {
           assigned_at: string;
           assigned_by: string | null;
           assessment_id: string;
-          category: string;
+          stage: string;
           comment: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
@@ -86,7 +89,7 @@ export type Database = {
           assigned_at?: string;
           assigned_by?: string | null;
           assessment_id: string;
-          category: string;
+          stage: string;
           comment?: string | null;
           reviewed_at?: string | null;
           reviewed_version?: number | null;
@@ -98,7 +101,7 @@ export type Database = {
           assigned_at?: string;
           assigned_by?: string | null;
           assessment_id?: string;
-          category?: string;
+          stage?: string;
           comment?: string | null;
           reviewed_at?: string | null;
           reviewed_version?: number | null;
@@ -138,7 +141,7 @@ export type Database = {
           actor_id: string | null;
           assessment_id: string;
           assessment_version: number;
-          category: string | null;
+          stage: string | null;
           comment: string | null;
           created_at: string;
           id: number;
@@ -149,7 +152,7 @@ export type Database = {
           actor_id?: string | null;
           assessment_id: string;
           assessment_version: number;
-          category?: string | null;
+          stage?: string | null;
           comment?: string | null;
           created_at?: string;
           id?: number;
@@ -160,7 +163,7 @@ export type Database = {
           actor_id?: string | null;
           assessment_id?: string;
           assessment_version?: number;
-          category?: string | null;
+          stage?: string | null;
           comment?: string | null;
           created_at?: string;
           id?: number;
@@ -270,7 +273,7 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: {
           assessment_id: string;
-          category: string;
+          stage: string;
           comment: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
@@ -282,10 +285,8 @@ export type Database = {
       admin_review_workflow_users: {
         Args: Record<PropertyKey, never>;
         Returns: {
-          ai_reviewer: boolean;
           cluster_lead: boolean;
           display_name: string;
-          employability_reviewer: boolean;
           teaching_director: boolean;
           user_id: string;
         }[];
@@ -314,12 +315,13 @@ export type Database = {
       assessment_review_status: {
         Args: { target_assessment_id: string };
         Returns: {
-          category: string;
+          awaiting_previous_stage: boolean;
           comment: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
           reviewer_id: string | null;
           reviewer_name: string | null;
+          stage: string;
           state: string;
         }[];
       };
@@ -328,7 +330,7 @@ export type Database = {
           decision: string;
           review_comment?: string | null;
           target_assessment_id: string;
-          target_category: string;
+          target_stage: string;
         };
         Returns: undefined;
       };
@@ -337,8 +339,10 @@ export type Database = {
         Returns: {
           assessment_id: string;
           assessment_version: number;
+          awaiting_previous_stage: boolean;
           can_review: boolean;
-          category: string;
+          checker_id: string | null;
+          checker_name: string | null;
           comment: string | null;
           content: Json;
           module_code: string;
@@ -346,6 +350,7 @@ export type Database = {
           owner_name: string | null;
           reviewed_version: number | null;
           reviewer_id: string | null;
+          stage: string;
           state: string;
           status: string;
           submitted_at: string | null;

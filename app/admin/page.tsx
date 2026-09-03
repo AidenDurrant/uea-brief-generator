@@ -16,11 +16,7 @@ type WorkflowUser =
   Database["public"]["Functions"]["admin_review_workflow_users"]["Returns"][number];
 type ReviewEvent =
   Database["public"]["Tables"]["assessment_review_events"]["Row"];
-type WorkflowRole =
-  | "cluster_lead"
-  | "ai_reviewer"
-  | "employability_reviewer"
-  | "teaching_director";
+type WorkflowRole = "cluster_lead" | "teaching_director";
 type WorkflowCapability = WorkflowRole;
 type Deadline = {
   assessmentId: string;
@@ -58,20 +54,9 @@ const REVIEWER_ROLES: {
   {
     value: "cluster_lead",
     label: "Cluster Lead",
-    description: "Academic review for assigned programme and level scopes",
+    description:
+      "Final sign-off for assigned programme and level scopes, after the checker",
     capability: "cluster_lead",
-  },
-  {
-    value: "ai_reviewer",
-    label: "AI Suitability Reviewer",
-    description: "Assessment AI policy and suitability validation",
-    capability: "ai_reviewer",
-  },
-  {
-    value: "employability_reviewer",
-    label: "Employability Skills Reviewer",
-    description: "Employability skills selection and wording validation",
-    capability: "employability_reviewer",
   },
 ];
 const TEACHING_DIRECTOR_ROLE = {
@@ -1206,9 +1191,11 @@ export default function AdminDashboard() {
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
                         {event.action.replaceAll("_", " ")}
                       </span>
-                      {event.category && (
-                        <span className="text-xs font-semibold capitalize text-slate-500">
-                          {event.category} review
+                      {event.stage && (
+                        <span className="text-xs font-semibold text-slate-500">
+                          {event.stage === "cluster_lead"
+                            ? "Cluster lead review"
+                            : "Checker review"}
                         </span>
                       )}
                       <span className="text-xs text-slate-400">

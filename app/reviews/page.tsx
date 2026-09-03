@@ -31,10 +31,10 @@ type AssessmentGroup = {
   reviews: QueueRow[];
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  academic: "Academic assessment review",
-  ai: "AI suitability",
-  employability: "Employability skills",
+// Approval runs setter -> checker -> cluster lead, in that order.
+const STAGE_LABELS: Record<string, string> = {
+  checker: "Checker review",
+  cluster_lead: "Cluster lead sign-off",
 };
 
 const REVIEW_BADGES: Record<string, string> = {
@@ -274,7 +274,8 @@ function ReviewCard({
     canReview &&
     ["in_review", "approved"].includes(assessmentStatus) &&
     row.state !== "approved";
-  const href = `./review?assessment=${encodeURIComponent(row.assessment_id)}&category=${encodeURIComponent(row.category)}`;
+  const isBlocked = row.awaiting_previous_stage && row.state !== "approved";
+  const href = `./review?assessment=${encodeURIComponent(row.assessment_id)}&stage=${encodeURIComponent(row.stage)}`;
 
   return (
     <article
@@ -289,10 +290,14 @@ function ReviewCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-            {canReview ? "Available to your role" : "Oversight"}
+            {isBlocked
+              ? "Waiting on checker"
+              : canReview
+                ? "Available to you now"
+                : "Oversight"}
           </p>
           <h3 className="mt-1 truncate text-sm font-semibold text-slate-950">
-            {CATEGORY_LABELS[row.category] ?? sentenceCase(row.category)}
+            {STAGE_LABELS[row.stage] ?? sentenceCase(row.stage)}
           </h3>
         </div>
         <StatusBadge state={row.state} />
@@ -666,15 +671,15 @@ export default function ReviewsPage() {
                         Review status and to-dos
                       </p>
                       <h3 className="mt-0.5 text-sm font-semibold text-slate-800">
-                        Open a category to inspect the complete brief and record
-                        a decision
+                        Open a stage to inspect the complete brief and record a
+                        decision
                       </h3>
                     </div>
                   </div>
                   <div className="grid gap-3 xl:grid-cols-3">
                     {group.reviews.map((row) => (
                       <ReviewCard
-                        key={`${row.assessment_id}:${row.category}`}
+                        key={`${row.assessment_id}:${row.stage}`}
                         row={row}
                         assessmentStatus={group.status}
                       />

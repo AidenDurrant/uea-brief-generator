@@ -16,7 +16,7 @@ A static-exported Next.js prototype for creating assessment briefs, authenticati
 - **Legacy dashboard redirect:** `/dashboard`
 - **Admin dashboard:** `/admin`
 - **Reviewer queue homepage:** `/reviews`
-- **Read-only review workspace:** `/review?assessment=ASSESSMENT_ID&category=REVIEW_CATEGORY`
+- **Read-only review workspace:** `/review?assessment=ASSESSMENT_ID&stage=REVIEW_STAGE`
 
 Only use synthetic assessment data until the university has approved the hosting, retention, and data-protection arrangements.
 
@@ -27,7 +27,7 @@ Only use synthetic assessment data until the university has approved the hosting
 - Inline mathematics with `$...$` and block mathematics with `$$...$$`, rendered by KaTeX
 - UG grading matrices with a 40% pass threshold
 - PGT grading matrices with a 50% pass threshold
-- Optional module-specific weightings for co-taught assessments
+- Optional module-specific weightings, marking schemes and grading matrices for co-taught assessments
 - Image attachments embedded in saved brief content
 
 KaTeX supports a broad, safe subset of LaTeX mathematics, but it is not a complete TeX distribution and does not load arbitrary LaTeX packages.
@@ -87,8 +87,8 @@ The schema creates:
 - profile policies
 - administrator read access
 - protected administrator statistics and user-management RPCs
-- shared reviewer-role pools, Cluster Lead scopes and review audit events
-- versioned approval, withdrawal and final-export RPCs
+- setter-nominated checkers, Cluster Lead scopes and review audit events
+- versioned two-stage approval, withdrawal and final-export RPCs
 
 Authenticated users may read display names so assessment ownership is understandable. Users may create and update only their own profile. They cannot directly change Administrator or workflow-role membership; protected RPCs require either Administrator or Teaching Director oversight access.
 
@@ -172,15 +172,22 @@ Regular users see and modify only their own assessments. Administrators and Teac
 
 ## Assessment approval workflow
 
-1. An MO/Instructor saves an assessment as a draft.
-2. Administrators and Teaching Directors manage shared reviewer pools. Cluster Leads review the Academic category for assessments matching their programme and level scopes. AI Suitability Reviewers and Employability Skills Reviewers have separate specialist queues.
-3. The owner uses **Submit for approval**, which is separate from saving. Submission requires at least one eligible non-owner reviewer in each required role pool.
-4. Every eligible role-holder can see the relevant work in `/reviews`; no individual reviewer is assigned to an assessment. They open the read-only `/review` workspace to approve or request changes. Approval comments are optional; withdrawal/change comments are mandatory.
-5. All three categories must approve the same assessment version before status becomes `approved`.
-6. Draft and incomplete-review exports contain a watermark. The owner receives a clean final export only after an atomic server-side approval check.
-7. Any saved brief edit after submission increments the version, invalidates all approvals, restores draft status and requires resubmission.
+Approval runs in a fixed order:
 
-One user may hold multiple reviewer roles, but an assessment owner can never review their own assessment. Administrator and Teaching Director are separate, traceable roles with the same oversight powers; neither adds a mandatory approval step. The admin dashboard retains the review-event audit trail. Programme and level scope mappings are stored in `cluster_lead_scopes`; assessments without this metadata cannot enter the academic review queue.
+```text
+Setter (creator) -> Checker (nominated by the setter) -> Cluster Lead
+```
+
+1. An MO/Instructor (the setter) saves an assessment as a draft.
+2. The setter nominates a **Checker** from the registered users in the builder's review workflow bar. Any registered user except the setter can be nominated. The nomination is stored in `assessments.checker_id`.
+3. The setter uses **Submit for approval**, which is separate from saving. Submission requires a nominated checker and at least one eligible non-owner Cluster Lead scoped to the assessment's programme and level.
+4. The checker opens the read-only `/review` workspace to approve or request changes. Approval comments are optional; withdrawal/change comments are mandatory.
+5. Only once the checker has approved the current version does the Cluster Lead stage open. Until then the brief appears in scoped Cluster Leads' `/reviews` queue marked *Waiting on checker*, and the approval controls are unavailable — the gate is enforced server-side, not just in the UI.
+6. When both stages have approved the same assessment version, status becomes `approved` and the assessment is finalised.
+7. Draft and incomplete-review exports contain a watermark. The setter receives a clean final export only after an atomic server-side approval check.
+8. Any saved brief edit after submission increments the version, invalidates both approvals, restores draft status and requires resubmission. The checker nomination survives so the brief can be resubmitted without re-picking.
+
+The setter can change the nominated checker only while the assessment is a draft. An assessment owner can never review their own assessment, and cannot nominate themselves as checker. Administrator and Teaching Director are separate, traceable roles with the same oversight powers; neither adds a mandatory approval step. The admin dashboard retains the review-event audit trail. Programme and level scope mappings are stored in `cluster_lead_scopes`; assessments without this metadata cannot enter the Cluster Lead queue.
 
 ## 7. Configure GitHub Pages build values
 

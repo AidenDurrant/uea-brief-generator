@@ -19,19 +19,21 @@ type ReviewerRole = Database["public"]["Tables"]["reviewer_roles"]["Row"];
 type ReviewAssignment =
   Database["public"]["Tables"]["assessment_review_assignments"]["Row"];
 type JsonRecord = { [key: string]: Json | undefined };
-type ReviewCategory = "academic" | "ai" | "employability";
+type ReviewStage = "checker" | "cluster_lead";
 type Deadline = { date: Date; description: string };
 
-const CATEGORIES: ReviewCategory[] = ["academic", "ai", "employability"];
-const CATEGORY_LABELS: Record<ReviewCategory, string> = {
-  academic: "Academic",
-  ai: "AI",
-  employability: "Employability",
+// Approval runs setter -> checker -> cluster lead, in that order.
+const STAGES: ReviewStage[] = ["checker", "cluster_lead"];
+const STAGE_LABELS: Record<ReviewStage, string> = {
+  checker: "Checker",
+  cluster_lead: "Cluster lead",
+};
+const UNASSIGNED_STAGES: Record<ReviewStage, string> = {
+  checker: "unassigned",
+  cluster_lead: "unassigned",
 };
 const ROLE_LABELS: Record<string, string> = {
   cluster_lead: "Cluster Lead",
-  ai_reviewer: "AI Suitability Reviewer",
-  employability_reviewer: "Employability Skills Reviewer",
   teaching_director: "Teaching Director",
 };
 const STATUS_STYLES: Record<string, string> = {
@@ -172,25 +174,25 @@ function StatusBadge({ status }: { status: string }) {
 function ApprovalIndicators({
   states,
 }: {
-  states: Record<ReviewCategory, string>;
+  states: Record<ReviewStage, string>;
 }) {
   return (
     <div
       className="flex flex-wrap gap-x-3 gap-y-1.5"
       aria-label="Approval states"
     >
-      {CATEGORIES.map((category) => {
-        const state = states[category];
+      {STAGES.map((stage) => {
+        const state = states[stage];
         return (
           <span
-            key={category}
+            key={stage}
             className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600"
-            title={`${CATEGORY_LABELS[category]}: ${sentenceCase(state)}`}
+            title={`${STAGE_LABELS[stage]}: ${sentenceCase(state)}`}
           >
             <span
               className={`h-2 w-2 rounded-full ${REVIEW_STYLES[state] ?? REVIEW_STYLES.unassigned}`}
             />
-            {CATEGORY_LABELS[category]}
+            {STAGE_LABELS[stage]}
             <span className="sr-only">: {sentenceCase(state)}</span>
           </span>
         );
@@ -354,19 +356,14 @@ export default function DashboardPage() {
   }, [loadDashboard]);
 
   const assignmentStates = useMemo(() => {
-    const byAssessment = new Map<string, Record<ReviewCategory, string>>();
+    const byAssessment = new Map<string, Record<ReviewStage, string>>();
     for (const assessment of assessments) {
-      byAssessment.set(assessment.id, {
-        academic: "unassigned",
-        ai: "unassigned",
-        employability: "unassigned",
-      });
+      byAssessment.set(assessment.id, { ...UNASSIGNED_STAGES });
     }
     for (const assignment of assignments) {
-      if (!CATEGORIES.includes(assignment.category as ReviewCategory)) continue;
+      if (!STAGES.includes(assignment.stage as ReviewStage)) continue;
       const states = byAssessment.get(assignment.assessment_id);
-      if (states)
-        states[assignment.category as ReviewCategory] = assignment.state;
+      if (states) states[assignment.stage as ReviewStage] = assignment.state;
     }
     return byAssessment;
   }, [assessments, assignments]);
@@ -375,7 +372,7 @@ export default function DashboardPage() {
     const states = assignmentStates.get(assessment.id);
     return (
       assessment.status === "draft" ||
-      CATEGORIES.some((category) => states?.[category] === "changes_requested")
+      STAGES.some((stage) => states?.[stage] === "changes_requested")
     );
   }).length;
   const inReviewCount = assessments.filter(
@@ -440,15 +437,15 @@ export default function DashboardPage() {
   const briefStatusText = (assessment: Assessment) => {
     const states = assignmentStates.get(assessment.id);
     if (
-      CATEGORIES.some((category) => states?.[category] === "changes_requested")
+      STAGES.some((stage) => states?.[stage] === "changes_requested")
     )
       return "Changes requested";
     if (assessment.status === "approved") return "Ready to export";
     if (assessment.status === "in_review") {
-      const approved = CATEGORIES.filter(
-        (category) => states?.[category] === "approved",
+      const approved = STAGES.filter(
+        (stage) => states?.[stage] === "approved",
       ).length;
-      return `${approved} of 3 approvals`;
+      return `${approved} of ${STAGES.length} approvals`;
     }
     return "Continue editing";
   };
@@ -685,11 +682,9 @@ export default function DashboardPage() {
                     <tbody className="divide-y divide-slate-100">
                       {filteredAssessments.map((assessment) => {
                         const deadline = nextDeadline(assessment);
-                        const states = assignmentStates.get(assessment.id) ?? {
-                          academic: "unassigned",
-                          ai: "unassigned",
-                          employability: "unassigned",
-                        };
+                        const states =
+                          assignmentStates.get(assessment.id) ??
+                          UNASSIGNED_STAGES;
                         return (
                           <tr
                             key={assessment.id}
@@ -761,11 +756,8 @@ export default function DashboardPage() {
                 <div className="divide-y divide-slate-100 md:hidden">
                   {filteredAssessments.map((assessment) => {
                     const deadline = nextDeadline(assessment);
-                    const states = assignmentStates.get(assessment.id) ?? {
-                      academic: "unassigned",
-                      ai: "unassigned",
-                      employability: "unassigned",
-                    };
+                    const states =
+                      assignmentStates.get(assessment.id) ?? UNASSIGNED_STAGES;
                     return (
                       <article key={assessment.id} className="p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -838,7 +830,7 @@ export default function DashboardPage() {
                 <div className="mt-4 space-y-2.5">
                   {personalQueue.map((row) => (
                     <article
-                      key={`${row.assessment_id}-${row.category}`}
+                      key={`${row.assessment_id}-${row.stage}`}
                       className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -860,12 +852,12 @@ export default function DashboardPage() {
                       </p>
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <span className="text-xs font-semibold text-slate-700">
-                          {CATEGORY_LABELS[row.category as ReviewCategory] ??
-                            sentenceCase(row.category)}{" "}
+                          {STAGE_LABELS[row.stage as ReviewStage] ??
+                            sentenceCase(row.stage)}{" "}
                           · {sentenceCase(row.state)}
                         </span>
                         <a
-                          href={`./review?assessment=${encodeURIComponent(row.assessment_id)}&category=${encodeURIComponent(row.category)}`}
+                          href={`./review?assessment=${encodeURIComponent(row.assessment_id)}&stage=${encodeURIComponent(row.stage)}`}
                           className="text-xs font-bold text-indigo-700 hover:text-indigo-900"
                         >
                           Review →

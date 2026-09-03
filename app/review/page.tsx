@@ -20,19 +20,18 @@ import { AppHeader } from "@/app/components/app-header";
 type QueueRow =
   Database["public"]["Functions"]["review_queue"]["Returns"][number];
 type AuthState = "loading" | "signed-out" | "authenticated";
-type ReviewCategory = "academic" | "ai" | "employability";
+type ReviewStage = "checker" | "cluster_lead";
 type JsonRecord = { [key: string]: Json | undefined };
 
-const CATEGORIES: ReviewCategory[] = ["academic", "ai", "employability"];
-const CATEGORY_LABELS: Record<ReviewCategory, string> = {
-  academic: "Academic",
-  ai: "AI suitability",
-  employability: "Employability",
+// Approval runs setter -> checker -> cluster lead, in that order.
+const STAGES: ReviewStage[] = ["checker", "cluster_lead"];
+const STAGE_LABELS: Record<ReviewStage, string> = {
+  checker: "Checker",
+  cluster_lead: "Cluster lead",
 };
-const CATEGORY_DESCRIPTIONS: Record<ReviewCategory, string> = {
-  academic: "Academic assessment review",
-  ai: "AI policy suitability",
-  employability: "Employability skills review",
+const STAGE_DESCRIPTIONS: Record<ReviewStage, string> = {
+  checker: "Checker review, nominated by the assessment setter",
+  cluster_lead: "Cluster lead sign-off, after the checker has approved",
 };
 const CONTENT_SECTIONS = [
   ["contextScenario", "Context & scenario"],
@@ -359,6 +358,87 @@ function ContentSection({
   );
 }
 
+type GradeBand = readonly [string, string, string];
+
+const UG_BANDS: GradeBand[] = [
+  ["fail", "Fail", "<40%"],
+  ["pass", "Pass", "40–49%"],
+  ["twoTwo", "2:2", "50–59%"],
+  ["twoOne", "2:1", "60–69%"],
+  ["first", "1st", "70–84%"],
+  ["excelled", "Excelled", "85%+"],
+];
+
+const PGT_BANDS: GradeBand[] = [
+  ["fail", "Fail", "<50%"],
+  ["twoTwo", "Pass", "50–59%"],
+  ["twoOne", "Merit", "60–69%"],
+  ["first", "Distinction", "70–84%"],
+  ["excelled", "Exceptional", "85%+"],
+];
+
+const bandsFor = (scheme: string): GradeBand[] =>
+  scheme === "PGT" ? PGT_BANDS : UG_BANDS;
+
+function RubricTable({
+  rows,
+  bands,
+}: {
+  rows: JsonRecord[];
+  bands: GradeBand[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+      <table className="min-w-240 border-collapse text-left text-xs">
+        <thead>
+          <tr className="bg-slate-100 text-slate-700">
+            <th className="sticky left-0 z-10 min-w-44 border-b border-r border-slate-200 bg-slate-100 px-3 py-3 font-bold">
+              Component
+            </th>
+            <th className="min-w-20 border-b border-r border-slate-200 px-3 py-3 font-bold">
+              Weight
+            </th>
+            {bands.map(([key, label, range]) => (
+              <th
+                key={key}
+                className="min-w-48 border-b border-r border-slate-200 px-3 py-3 font-bold last:border-r-0"
+              >
+                {label}
+                <span className="mt-0.5 block font-normal text-slate-500">
+                  {range}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr
+              key={`${text(row.component)}-${index}`}
+              className="align-top even:bg-slate-50/60"
+            >
+              <th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-3 py-3 font-semibold text-slate-900">
+                {text(row.component) || `Component ${index + 1}`}
+              </th>
+              <td className="border-b border-r border-slate-200 px-3 py-3 font-semibold text-slate-700">
+                {text(row.weight) || "—"}
+              </td>
+              {bands.map(([key]) => (
+                <td
+                  key={key}
+                  className="border-b border-r border-slate-200 px-3 py-3 leading-5 text-slate-600 last:border-r-0"
+                >
+                  <Markdown content={text(row[key])} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function reviewerLabel(row: QueueRow, user: User) {
   if (!row.reviewer_id) return "Not yet reviewed";
   if (row.reviewer_id === user.id) {
@@ -376,10 +456,10 @@ function reviewerLabel(row: QueueRow, user: User) {
 export default function ReviewPage() {
   const [queryReady, setQueryReady] = useState(false);
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [requestedCategory, setRequestedCategory] =
-    useState<ReviewCategory | null>(null);
-  const [selectedCategory, setSelectedCategory] =
-    useState<ReviewCategory>("academic");
+  const [requestedStage, setRequestedStage] =
+    useState<ReviewStage | null>(null);
+  const [selectedStage, setSelectedStage] =
+    useState<ReviewStage>("checker");
   const [authState, setAuthState] = useState<AuthState>(
     isSupabaseConfigured ? "loading" : "signed-out",
   );
@@ -396,14 +476,12 @@ export default function ReviewPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedAssessment = params.get("assessment")?.trim() ?? "";
-    const category = params.get("category");
+    const stage = params.get("stage");
     setAssessmentId(
       UUID_PATTERN.test(requestedAssessment) ? requestedAssessment : null,
     );
-    setRequestedCategory(
-      CATEGORIES.includes(category as ReviewCategory)
-        ? (category as ReviewCategory)
-        : null,
+    setRequestedStage(
+      STAGES.includes(stage as ReviewStage) ? (stage as ReviewStage) : null,
     );
     setQueryReady(true);
   }, []);
@@ -467,8 +545,8 @@ export default function ReviewPage() {
             .filter((row) => row.assessment_id === assessmentId)
             .sort(
               (a, b) =>
-                CATEGORIES.indexOf(a.category as ReviewCategory) -
-                CATEGORIES.indexOf(b.category as ReviewCategory),
+                STAGES.indexOf(a.stage as ReviewStage) -
+                STAGES.indexOf(b.stage as ReviewStage),
             )
         : [],
     [assessmentId, rows],
@@ -477,19 +555,19 @@ export default function ReviewPage() {
   useEffect(() => {
     if (!queryReady || !queueLoaded || !user || assessmentRows.length === 0)
       return;
-    if (requestedCategory) {
-      setSelectedCategory(requestedCategory);
+    if (requestedStage) {
+      setSelectedStage(requestedStage);
       return;
     }
     const available = assessmentRows.find((row) => row.can_review);
-    const first = available?.category ?? assessmentRows[0]?.category;
-    if (CATEGORIES.includes(first as ReviewCategory)) {
-      setSelectedCategory(first as ReviewCategory);
+    const first = available?.stage ?? assessmentRows[0]?.stage;
+    if (STAGES.includes(first as ReviewStage)) {
+      setSelectedStage(first as ReviewStage);
     }
-  }, [assessmentRows, queryReady, queueLoaded, requestedCategory, user]);
+  }, [assessmentRows, queryReady, queueLoaded, requestedStage, user]);
 
   const selectedRow = assessmentRows.find(
-    (row) => row.category === selectedCategory,
+    (row) => row.stage === selectedStage,
   );
   const assessment = assessmentRows[0];
   const root = assessment ? parseContent(assessment.content) : {};
@@ -512,12 +590,12 @@ export default function ReviewPage() {
     ? root.rubricRows.filter(isRecord)
     : [];
 
-  const chooseCategory = (category: ReviewCategory) => {
-    setSelectedCategory(category);
+  const chooseStage = (stage: ReviewStage) => {
+    setSelectedStage(stage);
     setComment("");
     setValidationError(null);
     const url = new URL(window.location.href);
-    url.searchParams.set("category", category);
+    url.searchParams.set("stage", stage);
     window.history.replaceState(
       null,
       "",
@@ -531,11 +609,10 @@ export default function ReviewPage() {
     const url = new URL(window.location.href);
     url.hash = "";
     const requestedAssessment = url.searchParams.get("assessment") ?? "";
-    const category = url.searchParams.get("category");
+    const stage = url.searchParams.get("stage");
     if (!UUID_PATTERN.test(requestedAssessment))
       url.searchParams.delete("assessment");
-    if (!CATEGORIES.includes(category as ReviewCategory))
-      url.searchParams.delete("category");
+    if (!STAGES.includes(stage as ReviewStage)) url.searchParams.delete("stage");
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: { redirectTo: url.toString() },
@@ -568,7 +645,7 @@ export default function ReviewPage() {
       "record_assessment_review",
       {
         target_assessment_id: selectedRow.assessment_id,
-        target_category: selectedRow.category,
+        target_stage: selectedRow.stage,
         decision,
         review_comment: reviewComment || null,
       },
@@ -584,7 +661,7 @@ export default function ReviewPage() {
       setComment("");
       setNotice(
         decision === "approve"
-          ? `${CATEGORY_LABELS[selectedCategory]} review approved.`
+          ? `${STAGE_LABELS[selectedStage]} review approved.`
           : "Changes requested and the approval withdrawn.",
       );
     }
@@ -673,23 +750,22 @@ export default function ReviewPage() {
     ["in_review", "approved"].includes(assessment.status);
   const isApproved = selectedRow?.state === "approved";
   const gradingScheme = text(formData.gradingScheme) || "UG";
-  const gradeBands =
-    gradingScheme === "PGT"
-      ? [
-          ["fail", "Fail", "<50%"],
-          ["twoTwo", "Pass", "50–59%"],
-          ["twoOne", "Merit", "60–69%"],
-          ["first", "Distinction", "70–84%"],
-          ["excelled", "Exceptional", "85%+"],
-        ]
-      : [
-          ["fail", "Fail", "<40%"],
-          ["pass", "Pass", "40–49%"],
-          ["twoTwo", "2:2", "50–59%"],
-          ["twoOne", "2:1", "60–69%"],
-          ["first", "1st", "70–84%"],
-          ["excelled", "Excelled", "85%+"],
-        ];
+  const gradeBands = bandsFor(gradingScheme);
+  const coTaughtOverrides = coTaughtModules.map((entry, index) => ({
+    label: text(entry.module) || `Co-taught module ${index + 1}`,
+    weighting: text(entry.weighting),
+    scheme: text(entry.gradingScheme) || gradingScheme,
+    markingScheme: text(entry.markingScheme),
+    rows: Array.isArray(entry.rubricRows)
+      ? entry.rubricRows.filter(isRecord)
+      : [],
+  }));
+  const coTaughtMarkingSchemes = coTaughtOverrides.filter(
+    (entry) => entry.markingScheme,
+  );
+  const coTaughtGradingMatrices = coTaughtOverrides.filter(
+    (entry) => entry.rows.length > 0,
+  );
 
   return (
     <main className="min-h-screen bg-[#f4f5f8] text-slate-950">
@@ -956,58 +1032,42 @@ export default function ReviewPage() {
                     content={text(formData[key])}
                   />
                 ))}
+                {coTaughtMarkingSchemes.map((entry) => (
+                  <ContentSection
+                    key={`marking-${entry.label}`}
+                    label={`Marking scheme — ${entry.label}`}
+                    content={entry.markingScheme}
+                  />
+                ))}
               </div>
             </SectionCard>
 
             <SectionCard number={6} title="Grading Matrix">
-              {rubricRows.length > 0 ? (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="min-w-240 border-collapse text-left text-xs">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700">
-                        <th className="sticky left-0 z-10 min-w-44 border-b border-r border-slate-200 bg-slate-100 px-3 py-3 font-bold">
-                          Component
-                        </th>
-                        <th className="min-w-20 border-b border-r border-slate-200 px-3 py-3 font-bold">
-                          Weight
-                        </th>
-                        {gradeBands.map(([key, label, range]) => (
-                          <th
-                            key={key}
-                            className="min-w-48 border-b border-r border-slate-200 px-3 py-3 font-bold last:border-r-0"
-                          >
-                            {label}
-                            <span className="mt-0.5 block font-normal text-slate-500">
-                              {range}
-                            </span>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rubricRows.map((row, index) => (
-                        <tr
-                          key={`${text(row.component)}-${index}`}
-                          className="align-top even:bg-slate-50/60"
-                        >
-                          <th className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-3 py-3 font-semibold text-slate-900">
-                            {text(row.component) || `Component ${index + 1}`}
-                          </th>
-                          <td className="border-b border-r border-slate-200 px-3 py-3 font-semibold text-slate-700">
-                            {text(row.weight) || "—"}
-                          </td>
-                          {gradeBands.map(([key]) => (
-                            <td
-                              key={key}
-                              className="border-b border-r border-slate-200 px-3 py-3 leading-5 text-slate-600 last:border-r-0"
-                            >
-                              <Markdown content={text(row[key])} />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {rubricRows.length > 0 || coTaughtGradingMatrices.length > 0 ? (
+                <div className="space-y-6">
+                  {rubricRows.length > 0 && (
+                    <div>
+                      {coTaughtGradingMatrices.length > 0 && (
+                        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                          Shared matrix
+                        </h3>
+                      )}
+                      <RubricTable rows={rubricRows} bands={gradeBands} />
+                    </div>
+                  )}
+                  {coTaughtGradingMatrices.map((entry) => (
+                    <div key={`matrix-${entry.label}`}>
+                      <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                        {entry.label}
+                        {entry.weighting ? ` · ${entry.weighting}` : ""} ·{" "}
+                        {entry.scheme}
+                      </h3>
+                      <RubricTable
+                        rows={entry.rows}
+                        bands={bandsFor(entry.scheme)}
+                      />
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm italic text-slate-400">
@@ -1061,34 +1121,36 @@ export default function ReviewPage() {
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <header className="border-b border-slate-200 px-5 py-4">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                  Category status
+                  Approval stages
                 </p>
                 <h2 className="mt-1 text-base font-semibold">
                   Three-part review
                 </h2>
               </header>
               <div className="divide-y divide-slate-100">
-                {CATEGORIES.map((category) => {
+                {STAGES.map((stage) => {
                   const row = assessmentRows.find(
-                    (item) => item.category === category,
+                    (item) => item.stage === stage,
                   );
                   return (
                     <button
-                      key={category}
+                      key={stage}
                       type="button"
-                      onClick={() => chooseCategory(category)}
-                      aria-pressed={selectedCategory === category}
-                      className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50 ${selectedCategory === category ? "bg-indigo-50/70 ring-1 ring-inset ring-indigo-200" : ""}`}
+                      onClick={() => chooseStage(stage)}
+                      aria-pressed={selectedStage === stage}
+                      className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50 ${selectedStage === stage ? "bg-indigo-50/70 ring-1 ring-inset ring-indigo-200" : ""}`}
                     >
                       <span className="min-w-0">
                         <span className="block text-xs font-semibold text-slate-800">
-                          {CATEGORY_LABELS[category]}
+                          {STAGE_LABELS[stage]}
                         </span>
                         <span className="mt-0.5 block text-[10px] text-slate-500">
                           {row
-                            ? row.can_review
-                              ? "Available to your role"
-                              : "Oversight view"
+                            ? row.awaiting_previous_stage
+                              ? "Waiting on the checker"
+                              : row.can_review
+                                ? "Available to you now"
+                                : "Oversight view"
                             : "Not available in your queue"}
                         </span>
                       </span>
@@ -1103,10 +1165,10 @@ export default function ReviewPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                    Selected category
+                    Selected stage
                   </p>
                   <h2 className="mt-1 text-base font-semibold">
-                    {CATEGORY_DESCRIPTIONS[selectedCategory]}
+                    {STAGE_DESCRIPTIONS[selectedStage]}
                   </h2>
                 </div>
                 <StatusBadge state={selectedRow?.state ?? "unavailable"} />
@@ -1206,18 +1268,20 @@ export default function ReviewPage() {
                     </div>
                   ) : (
                     <p className="mt-4 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
-                      {selectedRow.reviewer_id !== user.id
-                        ? selectedRow.reviewer_id
-                          ? "Read-only oversight: this category is assigned to another reviewer."
-                          : "Read-only oversight: no reviewer is assigned to this category."
-                        : "Actions are unavailable at this workflow stage."}
+                      {selectedRow.awaiting_previous_stage
+                        ? `Waiting on ${selectedRow.checker_name || "the checker"} to approve version ${selectedRow.assessment_version}. Cluster lead sign-off opens once they have.`
+                        : selectedRow.reviewer_id !== user.id
+                          ? selectedRow.reviewer_id
+                            ? "Read-only oversight: this stage is assigned to another reviewer."
+                            : "Read-only oversight: no reviewer is assigned to this stage."
+                          : "Actions are unavailable at this workflow stage."}
                     </p>
                   )}
                 </>
               ) : (
                 <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-600">
-                  This category is not exposed in your queue. Assigned reviewers
-                  can view and act only on their own category; administrators
+                  This stage is not exposed in your queue. Assigned reviewers
+                  can view and act only on their own stage; administrators
                   and Teaching Directors can see oversight rows.
                 </p>
               )}
