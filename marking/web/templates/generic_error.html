@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .background_img {width:25%;height: 25%;float: left;fill: none;stroke: #333;stroke-width: 1;stroke-linecap: round;stroke-linejoin: round;margin-right:2em;}
+    .error_text { margin-top: 8rem}
+</style>
+<!--Icon from: https://feathericons.com/ -->
+<svg class="background_img" viewbox="0 0 24 24" width="256px" >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+</svg>
+
+<h1 class="error_text">{{ msg }}</h1>
+
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Rubric for {{rubric.assignment.description}}
+            {% if version > 1 %}
+            v{{version}}
+            {% endif %}
+        </h1>
+
+        {% for section in rubric.sections.all %}
+        <h2 class="block">{{section.description}} ({{section.weight}}%)</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Mark</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for response in section.responses.all %}
+                    <tr>
+                        <td>{{response.description}}</td>
+                        <td>{{response.score}}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

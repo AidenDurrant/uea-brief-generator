@@ -1,0 +1,46 @@
+- model: web.supervisor
+  pk: 1
+  fields:
+    username: rjal
+    password: '{"alg": "scrypt", "n": 131072, "r": 8, "p": 1, "salt": "YfSeZQl75AqN8BHl9RNkog==",
+      "hash": "RBq7ajqDQ_yWfCEM1BGuO-W9gztIqV9O5p-CaC0kHok="}'
+    dn: Dr. Rudy J. Lapeer
+    bio: ''
+    admin: true
+- model: web.supervisor
+  pk: 28
+  fields:
+    username: jc
+    password: '{"alg": "scrypt", "n": 131072, "r": 8, "p": 1, "salt": "RWBDovlWDrrleFFgUNEC5Q==",
+      "hash": "k8TNsgEC0tKk14Uyla2lVzlk_qFiyr4-s9B6_GJz1Js="}'
+    dn: Dr Jeannette Chin
+    bio: ''
+    admin: false
+- model: web.sitesettings
+  pk: 1
+  fields:
+    key: site_hide_proj
+    value: 0
+    value_type: 4
+    changed: 2023-03-29 09:34:01.858231+00:00
+- model: web.sitesettings
+  pk: 2
+  fields:
+    key: site_stu_ro
+    value: 0
+    value_type: 4
+    changed: 2023-03-29 09:34:01.858231+00:00
+- model: web.sitesettings
+  pk: 3
+  fields:
+    key: site_sup_proj_lock
+    value: 0
+    value_type: 4
+    changed: 2023-03-29 09:34:01.858231+00:00
+- model: web.sitesettings
+  pk: 4
+  fields:
+    key: site_sup_resp_lock
+    value: 0
+    value_type: 4
+    changed: 2023-03-29 09:34:01.858231+00:00

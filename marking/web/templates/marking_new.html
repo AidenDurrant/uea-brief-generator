@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Grading {{student.gn}} {{student.fn}} ({{student.stu_num}})</h1>
+
+        <h2 class="block">New marking</h2>
+        <ul>
+            {% for assignment in assignments %}
+            <li>
+                <form method='post'>
+                    {% csrf_token %}
+                    <label>{{assignment.description}}</label>
+                    <input type="hidden" name="assignment" value="{{assignment.id}}">
+                    <input class="submit button is-primary" type="submit" value="New">
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+
+        {% if marker.admin %}
+        <h2>Admin options</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ otherForm.as_p }}
+            <input type="submit" class="submit button is-primary">
+        </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

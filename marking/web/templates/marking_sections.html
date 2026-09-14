@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Grading {{grading.assignment.description}}</h1>
+        <div class="block">
+            <p>For: <a href="{% url 'marking_student' student.id %}">{{student.gn}} {{student.fn}} ({{student.stu_num}})</a><br>
+            By: {{grading.marker}}</p>
+        </div>
+
+        <p>If you are the primary marker tick the box below and then click save.</p>
+
+        <!--<p>After marking, if you have some overall comments you can enter them in the box below and click save to store them.<br>
+        These are shown at the start of the detailed marksheet.
+        </p>-->
+
+        <form class="form block" method="post">
+            {% csrf_token %}
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="comment">Primary:</label>
+                </div>
+                <div class="field-body">
+                    <input id="primary" type="checkbox" name="primary" value="Primary" {% if details.primary.value %} checked {% endif %}>
+                    <p>I am the primary marker</p>
+                </div>
+            </div>
+
+            <!--<div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="comments">Comments:</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <textarea id="comments" name="comments" cols="80" rows="6">{{details.comments.value}}</textarea>
+                    </div>
+                </div>
+            </div>-->
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input type="submit" class="submit button is-primary" value="Save">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <p>This lists each of the sections in the rubric and shows the current mark assigned.<br>
+        Click on the link in the description to enter/change the mark.</p>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Mark</th>
+                    <th>Weight</th>
+                    <th>Weighted Mark</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for section in sections %}
+                <tr class="{% if not section.entry %}has-background-warning{%endif%}">
+                    <td><a href="{% url 'marking_entry' student.id grading.id section.info.id %}">{{section.info.description}}</a></td>
+                    <td>
+                        {% if section.entry %}
+                            {{section.entry.score}}%
+                        {% else %}
+                        No mark
+                        {% endif %}
+                    </td>
+                    <td>{{section.info.weight}}%</td>
+                    <td>
+                        {% if section.entry %}
+                            {{section.weighted}}%
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if section.entry.comment %}
+                <tr>
+                    <td></td>
+                    <td colspan="3">{{section.entry.comment}}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td><strong>Total:</strong></td>
+                    <td>{{total}}%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

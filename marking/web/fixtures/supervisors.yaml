@@ -1,0 +1,40 @@
+# Development supervisor accounts.
+#
+# The production list is loaded from the staff directory; this fixture exists so
+# `reset.bash` has something to load and so the assessment-brief approval
+# workflow (setter -> checker -> cluster lead, plus oversight) can be exercised
+# locally. Every account here has the password "password", matching the
+# convention testdata.yaml already uses for rjal/jc.
+
+- model: web.supervisor
+  pk: 2
+  fields:
+    username: setter
+    password: "{\"alg\": \"scrypt\", \"n\": 131072, \"r\": 8, \"p\": 1, \"salt\": \"-YPCx-4Rl1L4XZqPZ_f-FA==\", \"hash\": \"i__ws2eBPm_Uk7OLbNfBt3EMZ-PxZo3XM86F0lkzmUQ=\"}"
+    dn: Dr Sam Setter
+    bio: ''
+    admin: false
+- model: web.supervisor
+  pk: 3
+  fields:
+    username: checker
+    password: "{\"alg\": \"scrypt\", \"n\": 131072, \"r\": 8, \"p\": 1, \"salt\": \"Ly8mwgjrQaazCM_uZiRYoQ==\", \"hash\": \"Bb6ziG1gi-ZvlG8ousZkn448BeMrqRo1f0SessXFsDw=\"}"
+    dn: Dr Chris Checker
+    bio: ''
+    admin: false
+- model: web.supervisor
+  pk: 4
+  fields:
+    username: clead
+    password: "{\"alg\": \"scrypt\", \"n\": 131072, \"r\": 8, \"p\": 1, \"salt\": \"XrVi1vYe3l5Odm1lNQ40fw==\", \"hash\": \"p0WZOj2zP8UqtdXbLicdBPruN16IgAduEwgpN4T91G4=\"}"
+    dn: Prof Casey Lead
+    bio: ''
+    admin: false
+- model: web.supervisor
+  pk: 5
+  fields:
+    username: tdirector
+    password: "{\"alg\": \"scrypt\", \"n\": 131072, \"r\": 8, \"p\": 1, \"salt\": \"EkCMVLt-CJrzxMdfSqU5RQ==\", \"hash\": \"0dWf2GG4rfcAbFrlQFm8In9VtebFT3vH1HFRXY0EkEg=\"}"
+    dn: Prof Toni Director
+    bio: ''
+    admin: false

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor : Management : Allocation</h1>
+
+{% if other %}<h2 class="block">{{other}}</h2>{% endif %}
+
+<h2 class="block">Allocated</h2>
+<table class="table is-striped is-fullwidth">
+    <thead>
+        <tr>
+            <th>Project</th>
+            <th>Student</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for entry in allocated %}
+        <tr>
+            <td>{{entry.project.title}}</td>
+            <td>{{entry.student}}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h2 class="block">Pending</h2>
+<table class="table is-striped is-fullwidth">
+    <thead>
+        <tr>
+            <th>Project</th>
+            <th>Student</th>
+            <th>My Decision</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for entry in pending %}
+        <tr>
+            <td>{{entry.project.title}}</td>
+            <td>{{entry.student}}</td>
+            <td>{% if entry.result == 0 %}On-hold{% elif entry.result == 1 %}REJECTED{% elif entry.result == 2 %}ACCEPTED{% endif %}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

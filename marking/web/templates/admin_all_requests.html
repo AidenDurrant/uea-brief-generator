@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="block">
+    <p>Showing request filtered by: {{filter}}</p>
+    <p>Filter to show: <a href="?filter=all">All</a> | <a href="?filter=new">New | <a href="?filter=processed">Processed</a>| <a href="?filter=verified">Verified</a>  | <a href="?filter=round">All requests in this round</a></p>
+</div>
+
+{% for request in requests %}
+<article class="message {% if request.processed %}{% if request.result == 0 %}is-warning{% elif request.result == 1 %}is-danger{% elif request.result == 2 %}is-success{% endif %}{% endif %}">
+    <div class="message-header">
+        {{request.supervisor.dn}} - {{request.project.title}} - {{request.student.username}}
+        {% if request.new_submission %}
+        <br>
+        <form method="POST" action="{% url 'admin_move_to_onhold' request.id %}">
+            {% csrf_token %}
+            <input type="submit" class="button is-danger" value="Move to On-Hold for supervisor" />
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="message-body">
+        <h2>Student responses</h2>
+        <div class="columns">
+            <div class="column">
+                <h3 class="block">Statement</h3>
+                <p class="block">{{request.statement}}</p>
+            </div>
+            <div class="column">
+                <h3 class="block">Prerequisite statement</h3>
+                <p class="block">{{request.prereq}}</p>
+            </div>
+        </div>
+        {% if request.result == 1 %}
+        <h2>Supervisor response</h2>
+        <p>{{request.reject_reason}}</p>
+        {% endif %}
+    </div>
+</article>
+{% endfor %}
+
+<div class="pagination">
+    <span class="step-links">
+        {% if requests.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ requests.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ requests.number }} of {{ requests.paginator.num_pages }}
+        </span>
+
+        {% if requests.has_next %}
+            <a href="?page={{ requests.next_page_number }}">next</a>
+            <a href="?page={{ requests.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+
+{% endblock %}

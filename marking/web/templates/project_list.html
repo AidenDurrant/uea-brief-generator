@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">{{title}}</h1>
+
+{% if student and not requests_locked %}<a class="block button is-info" href="{% url 'own_project' %}">Create own project</a> {% endif %}
+
+<table class="table is-striped is-fullwidth">
+<thead>
+    <tr>
+        <th>Title</th>
+        <th>Supervisor</th>
+        <th>Multiplicity</th>
+        <th>Requests</th>
+    </tr>
+</thead>
+<tbody>
+{% for project in projects_page %}
+    <tr>
+        <td><a href="{% url 'project_info' project.id%}">{{project.title}}</a></td>
+        <td><a href="{% url 'supervisor_info' project.supervisor.id %}">{{project.supervisor.dn}}</a></td>
+        <td>{{project.mult}}</td>
+        <td>{{project.pending_requests}}</td>
+    </tr>
+{% endfor %}
+</tbody>
+</table>
+
+<div class="pagination">
+    <span class="step-links">
+        {% if projects_page.has_previous %}
+            <a href="?page=1{{query}}">&laquo; first</a>
+            <a href="?page={{ projects_page.previous_page_number }}{{query}}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ projects_page.number }} of {{ projects_page.paginator.num_pages }}
+        </span>
+
+        {% if projects_page.has_next %}
+            <a href="?page={{ projects_page.next_page_number }}{{query}}">next</a>
+            <a href="?page={{ projects_page.paginator.num_pages }}{{query}}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+
+{% endblock %}

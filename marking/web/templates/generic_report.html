@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">{{report_title}}</h1>
+
+<table class="table is-striped is-fullwidth">
+    <thead>
+        <tr>
+            {% for col_name in cols %}
+            <th>{{col_name}}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% for col in row %}
+            <td>
+            {% if col.0 %}<a href="{{col.0}}">{{col.1}}</a>{% else %}{{ col.1 }}{% endif %}
+            </td>
+            {% endfor %}
+        </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

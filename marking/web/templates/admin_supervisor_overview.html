@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor request overview</h1>
+
+<section class="block mb-4">
+    <a href="{% url 'admin_supervisor_overview' %}?export=xlsx">Download as xlsx</a>
+</section>
+
+<table class="table is-striped is-fullwidth">
+    <thead>
+        <tr>
+            <th>Supervisor</th>
+            <th>Current allocation</th>
+            <th>Multiplicity</th>
+            <th>Total Requests</th>
+            <th>Accepted</th>
+            <th>Rejected</th>
+            <th>New requests</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+        <tr>
+            <td><a href="{% url 'supervisor_allocated' %}?supervisor={{row.id}}">{{row.supervisor}}</a></td>
+            <td><a href="{% url 'supervisor_allocated' %}?supervisor={{row.id}}">{{row.current_allocated}}</a></td>
+            <td>{{row.total_mult}}</td>
+            <td>{{row.total_requests}}</td>
+            <td>{{row.total_accepted}}</td>
+            <td>{{row.total_rejected}}</td>
+            <td>{{row.new_requests}}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

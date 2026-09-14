@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    tr.warning { background: orange }
+    tr.danger { background: red}
+</style>
+<section class="block">
+    <div class="content">
+        <a href="#column_explain">Description of the columns is at the bottom of the page</a>
+
+        <h2>Filter</h2>
+        <p>You can filter this list to only show one combined grading using the control below.<br>
+            Just select the one from the drop down and click &apos;Apply Filter&apos;.
+        </p>
+        <form method="get" class="block">
+            {{comb_select_form.as_p}}
+            <input class="submit" type="submit" value="Apply Filter">
+        </form>
+
+        <table class="block">
+            <thead>
+                <tr>
+                    <th>Family name</th>
+                    <th>Given name</th>
+                    <th>ID</th>
+                    <th>Combined</th>
+                    <th>Supervisor</th>
+                    <th>Mark sheets</th>
+                    <th>Final completed</th>
+                    <th>Reason</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in results %}
+                <tr class="{{result.state}}">
+                    <td>{{result.student.fn}}</td>
+                    <td>{{result.student.gn}}</td>
+                    <td><a href="{% url 'marking_student' result.student.id %}">{{result.student.stu_num}}</a></td>
+                    <td>{{result.combined.combined.name}}</td>
+                    <td>{{result.student.supervisor}}</td>
+                    <td>{{result.grade_count}}</td>
+                    <td>
+                        {% if result.combined == None %}
+                        Not started
+                        {% else %}
+                        {{result.completed}}
+                        {% endif %}
+                    </td>
+                    <td>{{result.reason}}</td>
+                    <td>{{result.short_comments}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2 id="column_explain">Explanation of columns</h2>
+        <p>You can click on the student ID to see the marking page for that student.</p>
+        <dl>
+            <dt><strong>Mark sheets</strong></dt>
+            <dd>This lists the number of completed sheets for the student.<br>The markers are counted separately, so if there should be two marksheets and two markers this will be four when completed.</dd>
+            <dt><strong>Final completed</strong></dt>
+            <dd>True if all items have non-zero marks, False otherwise.<br>
+                If a student has been given 0 for a section this will not show as completed (as there's no way to know).
+            </dd>
+            <dt><strong>Comments</strong></dt>
+            <dd>Some markers have indicated in the comments if a section was not submitted/attended so part of the comment has been included.</dd>
+        </dl>
+    </div>
+</section>
+{% endblock %}

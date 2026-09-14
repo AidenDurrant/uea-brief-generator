@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor : Management : Projects</h1>
+
+{% if project_lock %}
+<div class="notification is-info">
+    <p>The editing and creating of projects is disabled at the moment. Please talk to the organiser to find out when this will be enabled.</p>
+</div>
+{% endif %}
+
+{% if not project_lock %}
+<div class="block"><a class="button" href="{% url 'supervisor_manage_projects_new' %}" >Create new project</a></div>
+{% endif %}
+
+<ul class="block">
+{% for project in projects %}
+    <li><a href="{% url 'supervisor_manage_projects_edit' project.id %}">{{project.title}}</a> {% if project.draft %}<strong>[DRAFT]</strong>{% endif %}</li>
+{% endfor %}
+</ul>
+{% endblock %}

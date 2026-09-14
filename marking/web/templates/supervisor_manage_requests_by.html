@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Requests by {{student}}</h1>
+
+<table class="table is-striped is-fullwidth">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Supervisor</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for request in student.requests.all %}
+        <tr>
+            <td>
+                {{request.project.title}}
+
+                {% if user.admin %}
+                    <a href="{% url 'admin_change_response' request.id %}"><button class="button is-small ml-1">Change response</button></a>
+                {% endif %}
+            </td>
+            <td>{{request.supervisor}}</td>
+            <td>
+                {% if request.processed %}
+                    {% if request.result == 0 %}On-hold{% elif request.result == 1 %}Rejected{% elif request.result == 2 %}Accepted{% endif %}
+                    ({{request.status_str}})
+                {% else %}
+                    Unprocessed
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

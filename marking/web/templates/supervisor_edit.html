@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<form class="block" method="POST">
+    {% csrf_token %}
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.bio.id_for_label }}">Biography</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.bio.errors %}
+                    <div class="notification is-danger">{{ form.bio.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" type="text" type="text" placeholder="Short biography" rows="10" name="{{ form.bio.html_name }}" id="{{ form.bio.auto_id }}">{% if form.bio.value %}{{ form.bio.value }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <input class="button is-primary" type="submit" value="Save changes">
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endblock %}

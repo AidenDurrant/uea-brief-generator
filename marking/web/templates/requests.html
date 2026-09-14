@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Requests</h1>
+
+{% for request in requests %}
+<article class="message {% if request.completed %} {% if request.accepted %}is-success{% else %}is-danger{% endif %} {% endif %}">
+    <div class="message-header">
+        {% if request.completed %}
+            {% if request.accepted %}ACCEPTED{% else %}REJECTED{% endif %}
+        {% else %}
+            PENDING
+        {% endif %}
+        
+        : <a href="{% url 'project_info' request.project.id %}">{{request.project.title}}</a> - {% if request.supervisor %} {{request.supervisor}} {% else %} Own project {% endif %}
+    </div>
+
+    <div class="message-body">
+        {% if request.completed %}
+            {% if not request.accepted %}
+            <h2>Supervisor response:</h2>
+            <p>{{request.reject_reason}}</p>
+            {% endif %}
+        {% endif %}
+        {% if request.status == 0 and not readonly %}
+            <a href="{% url 'delete_request' request.id %}"><button class="button is-danger">Delete this request</button></a>
+        {% endif %}
+    </div>
+</article>
+{% endfor %}
+
+{% endblock %}

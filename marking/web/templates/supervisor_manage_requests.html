@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor : Management : Requests</h1>
+
+{% if read_only %}
+<div class="notification is-info">
+    <p>Accepting/rejecting requests is disabled at the moment. Please talk to the organiser to find out when this will be enabled.</p>
+</div>
+{% endif %}
+
+{% for request in pending %}
+<div class="box">
+    <h2 class="block"><a href="{% url 'supervisor_manage_requests_by' request.student.id %}">{{request.student.username}}</a> - {{request.project.title}}</h2>
+    <p class="block"><strong>Submitted:</strong> {{request.submitted}}</p>
+
+    <div class="columns">
+        <div class="column">
+            <h3 class="block">Statement</h3>
+            <p class="block">{{request.statement}}</p>
+        </div>
+        <div class="column">
+            <h3 class="block">Prerequisite statement</h3>
+            <p class="block">{{request.prereq}}</p>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            <form method="POST" action="{% url 'supervisor_manage_request_accept' request.id %}" class="block">
+                {% csrf_token %}
+
+                <div class="field">
+                    <div class="control">
+                        <input class="button is-success" type="submit" value="Accept this student" {% if read_only %}disabled="disabled"{% endif %} />
+                    </div>
+                </div>
+            </form>
+            <form method="POST" action="{% url 'supervisor_manage_request_hold' request.id %}" class="block">
+                {% csrf_token %}
+
+                <div class="field">
+                    <div class="control">
+                        <input class="button is-warning" type="submit" value="Put request on hold" {% if read_only %}disabled="disabled"{% endif %} />
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="column">
+            <form method="POST" action="{% url 'supervisor_manage_request_reject' request.id %}" class="block">
+                {% csrf_token %}
+                <div class="field">
+                    <div class="control">
+                        <input class="button is-danger" type="submit" value="Reject this student" {% if read_only %}disabled="disabled"{% endif %} />
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="label_reason">Reason for rejection:</label>
+                    <div class="control">
+                        <textarea class="textarea" placeholder="Your statement here" name="reason" id="label_reason"></textarea>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<section class="block mb-4">
+    <a href="{% url 'supervisor_processed_requests' %}">See requests you have already processed</a>
+</section>
+
+{% endblock %}

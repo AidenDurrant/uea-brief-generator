@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Marking</h1>
+        <h3 class="block">Find student</h3>
+        <p>Start by finding a student to mark.</p>
+        <p>You can use part of the family name, given name, or student ID.</p>
+        <form method="post">
+            {% csrf_token %}
+            {{form.as_p}}
+            <input class="button submit is-primary" type="submit" value="Search">
+        </form>
+    </div>
+
+    {% if students %}
+    <div class="context">
+        <h3 class="block">Students you have started/completed grading</h3>
+        <ul>
+            {% for student in students %}
+            <li><a href="{% url 'marking_student' student.id %}">{{student.gn}} {{student.fn}} ({{student.stu_num}})</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

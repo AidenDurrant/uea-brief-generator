@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <h1 class="block">{{project.title}}</h1>
+    <h2 class="block">Supervisor: <a href="{% url 'supervisor_info' project.supervisor.id %}">{{project.supervisor.dn}}</a></h2>
+</section>
+
+<section class="block">
+    <div class="content">
+        <h3>Subjects</h3>
+        <div class="tags are-medium">
+            {% for subject_item in project.subjects.all %}
+            <span class="tag"><a href="{% url 'projects_in_subject' subject_item.id %}">{{subject_item.title}}</a></span>
+            {% endfor %}
+        </div>
+
+        <h3>Description</h3>
+        <p>{{project.description|linebreaksbr }}</p>
+
+        <h3>Requirements</h3>
+        <p>{{project.prereq|linebreaksbr }}</p>
+    </div>
+
+    {% if logged_in %}
+        {% if already_selected %}
+            <p><strong>You&apos;ve already made a request for this project.</strong></p>
+        {% else %}
+            {% if read_only %}
+            <div class="notification is-info">
+                <p>Project selection is not available at the moment. The organiser will inform you when it is.</p>
+            </div>
+            {% else %}
+            <a class="button is-primary is-large" href="{% url 'project_select' project.id %}">Select this project</a>
+            {% endif %}
+        {% endif %}
+    {% else %}
+    <p>You need to be logged in to select a project, you can <a href="{% url 'login' %}">login here</a>.</p>
+    {% endif %}
+</section>
+{% endblock %}

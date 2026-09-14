@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<script>
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken')
+
+async function send_verified_change(id, new_state) {
+    let form = new FormData()
+    form.append("new_state", new_state)
+
+    const response = await fetch("/manage/verify/" + id,
+    {
+        method:"POST",
+        headers:{
+            "X-CSRFToken":csrftoken,
+        },
+        body: form
+    });
+
+    return response.ok
+}
+
+async function unverify_pressed(event) {
+    let btn = event.srcElement
+    let item_id = btn.getAttribute('data-id')
+    let src = btn.parentElement.parentElement
+    let target = document.getElementById('pending_list')
+
+    let resp = await send_verified_change(item_id, false)
+    if (resp) {
+        target.appendChild(src)
+        btn.removeEventListener('click', unverify_pressed)
+        btn.textContent = 'Verify'
+        btn.addEventListener('click', verify_pressed)
+    }
+}
+
+async function verify_pressed(event) {
+    let btn = event.srcElement
+    let item_id = btn.getAttribute('data-id')
+    let src = btn.parentElement.parentElement
+    let target = document.getElementById('processed_list')
+
+    let resp = await send_verified_change(item_id, true)
+    if (resp) {
+        target.appendChild(src)
+        btn.removeEventListener('click', verify_pressed)
+        btn.textContent = 'Un-verify'
+        btn.addEventListener('click', unverify_pressed)
+    }
+}
+
+function attach_onclick(parent_id, target_func) {
+    let container = document.getElementById(parent_id)
+
+    let elements = container.getElementsByTagName("article")
+    for(let i=0; i<elements.length; i++) {
+        let element = elements[i]
+        let btn = element.getElementsByClassName("verify")[0]
+        btn.addEventListener('click',target_func)
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    attach_onclick("pending_list", verify_pressed)
+    attach_onclick("processed_list", unverify_pressed)
+})
+
+</script>
+
+<div class="block">
+    <a href="{% url 'admin_verify_check' %}"><button class="button" type="button">Check verified requests</button></a><br>
+</div>
+
+<h1 class="block">Un-verified</h1>
+
+<div id="pending_list" class="block">
+{% for request in pending %}
+<article class="message {% if request.result == 0 %}is-warning{% elif request.result == 1 %}is-danger{% elif request.result == 2 %}is-success{% endif %}">
+    <div class="message-header">
+        {% if request.result == 0 %}ON-HOLD{% elif request.result == 1 %}REJECTED{% elif request.result == 2 %}ACCEPTED{% endif %}:
+        <a href="{% url 'supervisor_manage_requests_by' request.student.id %}">{{request.student.username}}</a> - {{request.project.title}} - {{request.supervisor}}
+        <a class="button" href="{% url 'supervisor_manage_request_rellocate' request.id %}">Re-allocate</a>
+        <a class="button" href="{% url 'admin_change_response' request.id %}">Change</a>
+        <button class="button verify" type="button" data-id="{{request.id}}">Verify</button>
+    </div>
+
+    <div class="message-body">
+        <h2>Student responses</h2>
+        <div class="columns">
+            <div class="column">
+                <h3 class="block">Statement</h3>
+                <p class="block">{{request.statement}}</p>
+            </div>
+            <div class="column">
+                <h3 class="block">Prerequisite statement</h3>
+                <p class="block">{{request.prereq}}</p>
+            </div>
+        </div>
+        {% if not request.accepted %}
+        <h2>Supervisor response</h2>
+        <p>{{request.reject_reason}}</p>
+        {% endif %}
+    </div>
+</article>
+{% endfor %}
+</div>
+
+<h1 class="block">Verified</h1>
+
+<div id="processed_list" class="block">
+    {% for request in processed %}
+    <article class="message {% if request.result == 0 %}is-warning{% elif request.result == 1 %}is-danger{% elif request.result == 2 %}is-success{% endif %}">
+        <div class="message-header">{% if request.result == 0 %}ON-HOLD{% elif request.result == 1 %}REJECTED{% elif request.result == 2 %}ACCEPTED{% endif %}: <a href="{% url 'supervisor_manage_requests_by' request.student.id %}">{{request.student.username}}</a> - {{request.project.title}} - {{request.supervisor}}
+            <button class="button verify" type="button" data-id="{{request.id}}">Un-verify</button>
+        </div>
+    
+        <div class="message-body">
+            <h2>Student responses</h2>
+            <div class="columns">
+                <div class="column">
+                    <h3 class="block">Statement</h3>
+                    <p class="block">{{request.statement}}</p>
+                </div>
+                <div class="column">
+                    <h3 class="block">Prerequisite statement</h3>
+                    <p class="block">{{request.prereq}}</p>
+                </div>
+            </div>
+            {% if not request.accepted %}
+            <h2>Supervisor response</h2>
+            <p>{{request.reject_reason}}</p>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+
+{% endblock %}

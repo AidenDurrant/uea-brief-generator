@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if completed %}
+    <h2>Result</h2>
+    <p>Out of <strong>{{to_do}}</strong>, <strong>{{successful}}</strong> emails were sent</p>
+
+    {% if errors|length > 0 %}
+        <h2>Errors</h2>
+
+        <p>During the process some errors occured.</p>
+        <p>You can try again, any any that were not completed will be tried again.</p>
+
+        <ul>
+            {% for error in errors %}
+            <li>{{error}}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No errors occured.</p>
+    {% endif %}
+
+{% elif verify_ok %}
+<h1 class="block">Release results and email students</h1>
+<p class="block">Pressing the button below will email all the reponses to students and make them visible on the site.</p>
+
+<form method="POST">
+    {% csrf_token %}
+    <input type="submit" class="button is-danger" value="Release responses and email students">
+</form>
+{% else %}
+
+<h1 class="block">Multiple accepts for a single student.</h1>
+<p class="block">Go to the verify page and use the verify button to see the problem.</p>
+{% endif %}
+
+{% endblock %}

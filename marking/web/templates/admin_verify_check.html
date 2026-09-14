@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if all_ok %}
+<h1 class="block">No errors found</h1>
+{% else %}
+
+<h1 class="block">Multiple accepted projects</h1>
+
+<div id="pending_list" class="block">
+{% for request in multiple_accept %}
+<article class="message {% if request.result == 0 %}is-warning{% elif request.result == 1 %}is-danger{% elif request.result == 2 %}is-success{% endif %}">
+    <div class="message-header">
+        {% if request.result == 0 %}ON-HOLD{% elif request.result == 1 %}REJECTED{% elif request.result == 2 %}ACCEPTED{% endif %}:
+        <a href="{% url 'supervisor_manage_requests_by' request.student.id %}">{{request.student.username}}</a> - {{request.project.title}} - {{request.supervisor}}
+        <a class="button" href="{% url 'supervisor_manage_request_rellocate' request.id %}">Re-allocate</a>
+        <a class="button" href="{% url 'admin_change_response' request.id %}">Change</a>
+    </div>
+
+    <div class="message-body">
+        <h2>Student responses</h2>
+        <div class="columns">
+            <div class="column">
+                <h3 class="block">Statement</h3>
+                <p class="block">{{request.statement}}</p>
+            </div>
+            <div class="column">
+                <h3 class="block">Prerequisite statement</h3>
+                <p class="block">{{request.prereq}}</p>
+            </div>
+        </div>
+        {% if not request.accepted %}
+        <h2>Supervisor response</h2>
+        <p>{{request.reject_reason}}</p>
+        {% endif %}
+    </div>
+</article>
+{% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock %}

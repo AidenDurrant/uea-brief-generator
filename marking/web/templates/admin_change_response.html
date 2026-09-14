@@ -1,0 +1,34 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="block">
+    <p>Project: {{request.project.title}} ({{request.project.supervisor}})</p>
+    <p>Supervisor: {{request.supervisor}}</p>
+    <p>Student: <a href="{% url 'supervisor_manage_requests_by' request.student.id %}">{{request.student}}</a></p>
+</section>
+
+<h2>Change the request to...</h2>
+
+<form method="POST" action="{% url 'admin_change_response' request.id %}?ack={{request.id}}" class="block">
+    {% csrf_token %}
+    <input type="hidden" name="new_result" value="2" />
+    <input type="submit" class="submit button is-success" value="Accept the request">
+</form>
+
+<form method="POST" action="{% url 'admin_change_response' request.id %}?ack={{request.id}}" class="block">
+    {% csrf_token %}
+    <strong>Reason for changing to reject:</strong><br>
+    <textarea class="textarea" name="reason"></textarea>
+    <input type="hidden" name="new_result" value="1" />
+    <input type="submit" class="submit button is-danger" value="Reject the request">
+</form>
+
+<form method="POST" action="{% url 'admin_change_response' request.id %}?ack={{request.id}}" class="block">
+    {% csrf_token %}
+    <input type="hidden" name="new_result" value="0" />
+    <input type="submit" class="submit button is-warning" value="Put on-hold">
+</form>
+
+{% endblock %}

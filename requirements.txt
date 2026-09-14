@@ -1,0 +1,5 @@
+django>=5,<6
+pyyaml
+ldap3
+pycryptodome
+openpyxl

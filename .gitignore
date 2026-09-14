@@ -1,7 +1,23 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
+# ── Python / Django ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+/marking/*.dll
+
+# Marking site generated output
+*.pdf
+*.csv
+*.7z
+
+# The exported Next.js bundle (marking/briefs/bundle/) is deliberately NOT
+# ignored: committing it is what lets a release be a pull plus a restart on a
+# server with no Node installed. Rebuild it with `npm run build:install`.
+
+# ── Node / Next.js (frontend/) ───────────────────────────────────────────────
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,8 +30,8 @@
 /coverage
 
 # next.js
-/.next/
-/out/
+.next/
+/frontend/out/
 
 # production
 /build

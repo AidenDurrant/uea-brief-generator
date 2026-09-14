@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor : Management : Processed requests</h1>
+
+{% if read_only %}
+<div class="notification is-info">
+    <p>Accepting/rejecting requests is disabled at the moment. Please talk to the organiser to find out when this will be enabled.</p>
+</div>
+{% endif %}
+
+{% for request in processed %}
+<div class="box">
+    <h2 class="block">{{request.student.username}} - {{request.project.title}}</h2>
+    <p class="block"><strong>Submitted:</strong> {{request.submitted}}</p>
+
+    <div class="columns">
+        <div class="column">
+            <h3 class="block">Statement</h3>
+            <p class="block">{{request.statement}}</p>
+        </div>
+        <div class="column">
+            <h3 class="block">Prerequisite statement</h3>
+            <p class="block">{{request.prereq}}</p>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            {% if request.result == 0 %}
+            <p>You put this request On-hold</p>
+            {% elif request.result == 1 %}
+            <p>You rejected this request with the following reason:</p>
+            <textarea cols="60" rows="5">{{request.reject_reason}}</textarea>
+            {% elif request.result == 2 %}
+            <p>You accepted this request</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="columns">
+        <form method="POST" action="{% url 'supervisor_manage_request_reset' request.id %}">
+            {% csrf_token %}
+            <input class="button is-danger" type="submit" value="Reset this reponse" {% if read_only %}disabled="disabled"{% endif %} />
+        </form>
+    </div>
+
+</div>
+{% endfor %}
+
+<section class="block mb-4">
+    <a class="mb-2" href="{% url 'supervisor_manage_requests' %}">See requests you still need to process</a>
+</section>
+
+{% endblock %}

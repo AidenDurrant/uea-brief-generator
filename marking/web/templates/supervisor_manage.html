@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="block">
+    <h1 class="block">Project Management</h1>
+
+    <div class="block">
+        {% if project_lock %}
+        <div class="notification is-info">
+            <p>Project creation and editing is currently disabled.<br>Please talk to the organiser to find out more.</p>
+        </div>
+        {% else %}
+        <a href="{% url 'supervisor_manage_projects' %}">Edit my projects</a>
+        {% endif %}
+    </div>
+    <div class="block">
+        {% if response_lock %}
+        <div class="notification is-info">
+            <p>Accepting/rejection student requests is currently disabled.<br>Please talk to the organiser to find out more.</p>
+        </div>
+        {% else %}
+        <ul>
+            <li><a href="{% url 'supervisor_manage_requests' %}">View project requests</a></li>
+            <li><a href="{% url 'supervisor_processed_requests' %}">View project requests you have processed</a></li>
+        </ul>
+        {% endif %}
+    </div>
+    <div class="block">
+        <a href="{% url 'supervisor_allocated' %}">View students that have been allocated to you</a>
+    </div>
+</section>
+
+<section class="block">
+    <h1 class="block">Profile</h1>
+
+    <ul>
+        <li><a href="{% url 'supervisor_profile_edit' %}">Edit my profile</a></li>
+    </ul>
+</section>
+
+<section class="block">
+    {% if supervisor.admin %}
+    <h1 class="block">Site Admin</h1>
+    <ul>
+        <li><a href="{% url 'admin_all_requests' %}">See all student requests</a></li>
+        <li><a href="{% url 'admin_supervisor_overview' %}">View overview of all supervisors requests</a></li>
+        <li><a href="{% url 'admin_export_requests' %}">Download an XLSX of all current requests</a></li>
+        <li><a href="{% url 'admin_view_responses' %}">Verify supervisor responses</a></li>
+        <li><a href="{% url 'admin_release_supervisor_results' %}">Send responses to students</a></li>
+    </ul>
+    {% endif %}
+</section>
+
+{% endblock %}

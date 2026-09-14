@@ -1,0 +1,1281 @@
+- model: web.markingstudent
+  pk: 1
+  fields:
+    gn: alice
+    fn: student1
+    stu_num: 1111
+- model: web.markingstudent
+  pk: 2
+  fields:
+    gn: bob
+    fn: student2
+    stu_num: 2222
+
+
+
+- model: web.markingassignment
+  pk: 1
+  fields:
+    description: Final year project report
+
+- model: web.markingrubric
+  pk: 1
+  fields:
+    assignment: 1
+    version: 0
+
+- model: web.markingsection
+  pk: 1
+  fields:
+    rubric: 1
+    description: "Introduction: Abstract, Statement and Motivation"
+    ordering: 100
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 1
+  fields:
+    section: 1
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 2
+  fields:
+    section: 1
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 3
+  fields:
+    section: 1
+    description: "Inadequate abstract, statement and/or unclear motivation"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 4
+  fields:
+    section: 1
+    description: "Abstract, statement, and/or motivation present but lacks clarity"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 5
+  fields:
+    section: 1
+    description: "Abstract, statement and motivation present but can be clearer"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 6
+  fields:
+    section: 1
+    description: "Clear abstract, statement and motivation"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 7
+  fields:
+    section: 1
+    description: "Very good abstract, statement and motivation "
+    score: 70
+- model: web.markingsectionresponse
+  pk: 8
+  fields:
+    section: 1
+    description: "Excellent abstract, statement and motivation"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 9
+  fields:
+    section: 1
+    description: "Outstanding abstract, statement and motivation"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 10
+  fields:
+    section: 1
+    description: "Perfect abstract, statement and motivation"
+    score: 100
+
+- model: web.markingsection
+  pk: 2
+  fields:
+    rubric: 1
+    description: "Introduction: Aims & Objectives (can incl. MoSCoW)"
+    ordering: 110
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 11
+  fields:
+    section: 2
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 12
+  fields:
+    section: 2
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 13
+  fields:
+    section: 2
+    description: "Unclear aims and objectives and/or incoherent MoSCoW"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 14
+  fields:
+    section: 2
+    description: "Present but not complete or consistent"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 15
+  fields:
+    section: 2
+    description: "Present but not quite complete and not always consistent"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 16
+  fields:
+    section: 2
+    description: "Aims and objectives present"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 17
+  fields:
+    section: 2
+    description: "Clear aims and objectives that are consistent"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 18
+  fields:
+    section: 2
+    description: "Very detailed aims and objectives"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 19
+  fields:
+    section: 2
+    description: "Outstanding detail on aims and objectives"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 20
+  fields:
+    section: 2
+    description: "Perfect account of aims and objectives"
+    score: 100
+
+- model: web.markingsection
+  pk: 3
+  fields:
+    rubric: 1
+    description: "Background: Relevance"
+    ordering: 120
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 21
+  fields:
+    section: 3
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 22
+  fields:
+    section: 3
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 23
+  fields:
+    section: 3
+    description: "A distinct number of references are irrelevant"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 24
+  fields:
+    section: 3
+    description: "Some references are irrelevant"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 25
+  fields:
+    section: 3
+    description: "Mostly relevant references"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 26
+  fields:
+    section: 3
+    description: "The majority of references are relevant"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 27
+  fields:
+    section: 3
+    description: "All references are relevant"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 28
+  fields:
+    section: 3
+    description: "All references are relevant and are well selected"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 29
+  fields:
+    section: 3
+    description: "All references are relevant and are expertly selected"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 30
+  fields:
+    section: 3
+    description: "All references are perfectly selected"
+    score: 100
+
+- model: web.markingsection
+  pk: 4
+  fields:
+    rubric: 1
+    description: "Background: Critical Review"
+    ordering: 130
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 31
+  fields:
+    section: 4
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 32
+  fields:
+    section: 4
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 33
+  fields:
+    section: 4
+    description: "Poor review and no critical element"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 34
+  fields:
+    section: 4
+    description: "Some review but no critical element"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 35
+  fields:
+    section: 4
+    description: "A review with some critical element"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 36
+  fields:
+    section: 4
+    description: "A good review with adequate critical element"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 37
+  fields:
+    section: 4
+    description: "A very good review with a good critical element"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 38
+  fields:
+    section: 4
+    description: "An excellent review with a distinct critical element"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 39
+  fields:
+    section: 4
+    description: "An outstanding critical review"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 40
+  fields:
+    section: 4
+    description: "A perfect critical review"
+    score: 100
+
+- model: web.markingsection
+  pk: 5
+  fields:
+    rubric: 1
+    description: "Preparation: Quality incl. clarity  & correctness of methodology, design and planning"
+    ordering: 140
+    weight: 15
+
+- model: web.markingsectionresponse
+  pk: 41
+  fields:
+    section: 5
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 42
+  fields:
+    section: 5
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 43
+  fields:
+    section: 5
+    description: "Distinct lack of clarity and/or correctness"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 44
+  fields:
+    section: 5
+    description: "Not always correct and/or clear coverage"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 45
+  fields:
+    section: 5
+    description: "Largely correct and/or clear coverage"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 46
+  fields:
+    section: 5
+    description: "Correct and clear coverage"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 47
+  fields:
+    section: 5
+    description: "Very clear and correct coverage"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 48
+  fields:
+    section: 5
+    description: "Excellent  coverage"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 49
+  fields:
+    section: 5
+    description: "Outstanding coverage"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 50
+  fields:
+    section: 5
+    description: "Perfect coverage "
+    score: 100
+
+- model: web.markingsection
+  pk: 6
+  fields:
+    rubric: 1
+    description: "Preparation: Relevance and completeness of methodology, design and planning"
+    ordering: 150
+    weight: 15
+
+- model: web.markingsectionresponse
+  pk: 51
+  fields:
+    section: 6
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 52
+  fields:
+    section: 6
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 53
+  fields:
+    section: 6
+    description: "Incomplete and/or irrelevant"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 54
+  fields:
+    section: 6
+    description: "Some planning or method or design"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 55
+  fields:
+    section: 6
+    description: "Adequate planning or method or design"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 56
+  fields:
+    section: 6
+    description: "Good planning or method or design"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 57
+  fields:
+    section: 6
+    description: "Very good planning or method or design"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 58
+  fields:
+    section: 6
+    description: "Excellent planning or method or design"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 59
+  fields:
+    section: 6
+    description: "Outstanding planning or method or design"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 60
+  fields:
+    section: 6
+    description: "Perfect planning or method or design"
+    score: 100
+
+- model: web.markingsection
+  pk: 7
+  fields:
+    rubric: 1
+    description: "Implementation: Results - Quality"
+    ordering: 160
+    weight: 10
+
+- model: web.markingsectionresponse
+  pk: 61
+  fields:
+    section: 7
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 62
+  fields:
+    section: 7
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 63
+  fields:
+    section: 7
+    description: "Insufficient quality "
+    score: 30
+- model: web.markingsectionresponse
+  pk: 64
+  fields:
+    section: 7
+    description: "Minimal quality results"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 65
+  fields:
+    section: 7
+    description: "Acceptable results"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 66
+  fields:
+    section: 7
+    description: "Good results"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 67
+  fields:
+    section: 7
+    description: "Very Good results"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 68
+  fields:
+    section: 7
+    description: "Excellent results"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 69
+  fields:
+    section: 7
+    description: "Outstanding results"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 70
+  fields:
+    section: 7
+    description: "Perfect results"
+    score: 100
+
+- model: web.markingsection
+  pk: 8
+  fields:
+    rubric: 1
+    description: "Implementation: Results - Quantity"
+    ordering: 170
+    weight: 10
+
+- model: web.markingsectionresponse
+  pk: 71
+  fields:
+    section: 8
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 72
+  fields:
+    section: 8
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 73
+  fields:
+    section: 8
+    description: "Inadequate results"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 74
+  fields:
+    section: 8
+    description: "Minimal results"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 75
+  fields:
+    section: 8
+    description: "Some results"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 76
+  fields:
+    section: 8
+    description: "Good number of results"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 77
+  fields:
+    section: 8
+    description: "Very good number of results"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 78
+  fields:
+    section: 8
+    description: "Excellent number of results"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 79
+  fields:
+    section: 8
+    description: "Outstanding number of results"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 80
+  fields:
+    section: 8
+    description: "Perfect number of results"
+    score: 100
+
+- model: web.markingsection
+  pk: 9
+  fields:
+    rubric: 1
+    description: "Implementation: Validation & Testing"
+    ordering: 180
+    weight: 10
+
+- model: web.markingsectionresponse
+  pk: 81
+  fields:
+    section: 9
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 82
+  fields:
+    section: 9
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 83
+  fields:
+    section: 9
+    description: "Inadequate validation and testing"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 84
+  fields:
+    section: 9
+    description: "Minimal validation and testing"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 85
+  fields:
+    section: 9
+    description: "Adequate validation and testing"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 86
+  fields:
+    section: 9
+    description: "Good validation and testing"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 87
+  fields:
+    section: 9
+    description: "Very good validation and testing"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 88
+  fields:
+    section: 9
+    description: "Excellent validation and testing"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 89
+  fields:
+    section: 9
+    description: "Outstanding validation and testing"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 90
+  fields:
+    section: 9
+    description: "Perfect validation and testing"
+    score: 100
+
+- model: web.markingsection
+  pk: 10
+  fields:
+    rubric: 1
+    description: "Conclusion: Frankness, completion of original objectives"
+    ordering: 190
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 91
+  fields:
+    section: 10
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 92
+  fields:
+    section: 10
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 93
+  fields:
+    section: 10
+    description: "Inadequate conclusive statement"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 94
+  fields:
+    section: 10
+    description: "Minimal conclusive statement"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 95
+  fields:
+    section: 10
+    description: "Conclusive statement but not entirely addressing objectives"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 96
+  fields:
+    section: 10
+    description: "Conclusive statement that largely addresses objectives"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 97
+  fields:
+    section: 10
+    description: "Very good conclusive statement"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 98
+  fields:
+    section: 10
+    description: "Excellent conclusive statement"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 99
+  fields:
+    section: 10
+    description: "Outstanding conclusive statement"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 100
+  fields:
+    section: 10
+    description: "Perfect conclusive statement"
+    score: 100
+
+- model: web.markingsection
+  pk: 11
+  fields:
+    rubric: 1
+    description: "Conclusion: Shortcomings and future work"
+    ordering: 200
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 101
+  fields:
+    section: 11
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 102
+  fields:
+    section: 11
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 103
+  fields:
+    section: 11
+    description: "Inadequate coverage on shortcomings and future work"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 104
+  fields:
+    section: 11
+    description: "Minimal coverage on shortcomings and future work"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 105
+  fields:
+    section: 11
+    description: "Adequate coverage on shortcomings and future work"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 106
+  fields:
+    section: 11
+    description: "Good coverage on shortcomings and future work"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 107
+  fields:
+    section: 11
+    description: "Very good coverage on shortcomings and future work"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 108
+  fields:
+    section: 11
+    description: "Excellent coverage on shortcomings and future work"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 109
+  fields:
+    section: 11
+    description: "Outstanding coverage on shortcomings and future work"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 110
+  fields:
+    section: 11
+    description: "Perfect coverage on shortcomings and future work"
+    score: 100
+
+- model: web.markingsection
+  pk: 12
+  fields:
+    rubric: 1
+    description: "Quality and accuracy of writing"
+    ordering: 210
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 111
+  fields:
+    section: 12
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 112
+  fields:
+    section: 12
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 113
+  fields:
+    section: 12
+    description: "Distinct lack of quality and accuracy of writing"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 114
+  fields:
+    section: 12
+    description: "Minimal quality and accuracy of writing"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 115
+  fields:
+    section: 12
+    description: "Adequate quality and accuracy of writing"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 116
+  fields:
+    section: 12
+    description: "Good quality and accuracy of writing"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 117
+  fields:
+    section: 12
+    description: "Very good quality and accuracy of writing"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 118
+  fields:
+    section: 12
+    description: "Excellent quality and accuracy of writing"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 119
+  fields:
+    section: 12
+    description: "Outstanding quality and accuracy of writing"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 120
+  fields:
+    section: 12
+    description: "Perfect quality and accuracy of writing"
+    score: 100
+
+- model: web.markingsection
+  pk: 13
+  fields:
+    rubric: 1
+    description: "Formatting"
+    ordering: 220
+    weight: 5
+
+- model: web.markingsectionresponse
+  pk: 121
+  fields:
+    section: 13
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 122
+  fields:
+    section: 13
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 123
+  fields:
+    section: 13
+    description: "Unclear formatting"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 124
+  fields:
+    section: 13
+    description: "Basic formatting"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 125
+  fields:
+    section: 13
+    description: "Adequate formatting"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 126
+  fields:
+    section: 13
+    description: "Good formatting"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 127
+  fields:
+    section: 13
+    description: "Very good formatting"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 128
+  fields:
+    section: 13
+    description: "Excellent formatting"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 129
+  fields:
+    section: 13
+    description: "Outstanding formatting"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 130
+  fields:
+    section: 13
+    description: "Perfect formatting"
+    score: 100
+
+
+
+
+- model: web.markingassignment
+  pk: 2
+  fields:
+    description: Final year project inspection
+
+- model: web.markingrubric
+  pk: 2
+  fields:
+    assignment: 2
+    version: 0
+
+- model: web.markingsection
+  pk: 14
+  fields:
+    rubric: 2
+    description: "Project Introduction"
+    ordering: 100
+    weight: 10
+
+- model: web.markingsectionresponse
+  pk: 131
+  fields:
+    section: 14
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 132
+  fields:
+    section: 14
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 133
+  fields:
+    section: 14
+    description: "Inadequate Introduction"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 134
+  fields:
+    section: 14
+    description: "Poor Introduction "
+    score: 40
+- model: web.markingsectionresponse
+  pk: 135
+  fields:
+    section: 14
+    description: "Acceptable Introduction"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 136
+  fields:
+    section: 14
+    description: "Good Introduction "
+    score: 60
+- model: web.markingsectionresponse
+  pk: 137
+  fields:
+    section: 14
+    description: "Very good Introduction"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 138
+  fields:
+    section: 14
+    description: "Excellent Introduction"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 139
+  fields:
+    section: 14
+    description: "Outstanding Introduction"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 140
+  fields:
+    section: 14
+    description: "Perfect Introduction"
+    score: 100
+
+- model: web.markingsection
+  pk: 15
+  fields:
+    rubric: 2
+    description: "Explanation of specific solution components"
+    ordering: 110
+    weight: 40
+
+- model: web.markingsectionresponse
+  pk: 141
+  fields:
+    section: 15
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 142
+  fields:
+    section: 15
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 143
+  fields:
+    section: 15
+    description: "Inadequate (coverage of) achievements"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 144
+  fields:
+    section: 15
+    description: "Poor (coverage of) achievements"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 145
+  fields:
+    section: 15
+    description: "Acceptable (coverage of) achievements"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 146
+  fields:
+    section: 15
+    description: "Good (coverage of) achievements"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 147
+  fields:
+    section: 15
+    description: "Very good (coverage of) achievements"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 148
+  fields:
+    section: 15
+    description: "Excellent (coverage of) achievements"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 149
+  fields:
+    section: 15
+    description: "Outstanding (coverage of) achievements"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 150
+  fields:
+    section: 15
+    description: "Perfect (coverage of) achievements"
+    score: 100
+
+- model: web.markingsection
+  pk: 16
+  fields:
+    rubric: 2
+    description: "Conclusion"
+    ordering: 120
+    weight: 15
+
+- model: web.markingsectionresponse
+  pk: 151
+  fields:
+    section: 16
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 152
+  fields:
+    section: 16
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 153
+  fields:
+    section: 16
+    description: "Unclear Conclusion"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 154
+  fields:
+    section: 16
+    description: "Passable Conclusion"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 155
+  fields:
+    section: 16
+    description: "Acceptable Conclusion"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 156
+  fields:
+    section: 16
+    description: "Clear Conclusion"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 157
+  fields:
+    section: 16
+    description: "Very clear Conclusion"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 158
+  fields:
+    section: 16
+    description: "Excellent Conclusion"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 159
+  fields:
+    section: 16
+    description: "Outstanding Conclusion"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 160
+  fields:
+    section: 16
+    description: "Perfect Conclusion"
+    score: 100
+
+- model: web.markingsection
+  pk: 17
+  fields:
+    rubric: 2
+    description: "Clarity and structure"
+    ordering: 130
+    weight: 20
+
+- model: web.markingsectionresponse
+  pk: 161
+  fields:
+    section: 17
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 162
+  fields:
+    section: 17
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 163
+  fields:
+    section: 17
+    description: "Unclear"
+    score: 30
+- model: web.markingsectionresponse
+  pk: 164
+  fields:
+    section: 17
+    description: "Poor"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 165
+  fields:
+    section: 17
+    description: "Acceptable"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 166
+  fields:
+    section: 17
+    description: "Clear"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 167
+  fields:
+    section: 17
+    description: "Very clear"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 168
+  fields:
+    section: 17
+    description: "Excellent"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 169
+  fields:
+    section: 17
+    description: "Outstanding"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 170
+  fields:
+    section: 17
+    description: "Perfect"
+    score: 100
+
+- model: web.markingsection
+  pk: 18
+  fields:
+    rubric: 2
+    description: "Reflection and understanding"
+    ordering: 140
+    weight: 15
+
+- model: web.markingsectionresponse
+  pk: 171
+  fields:
+    section: 18
+    description: "No attempt made"
+    score: 0
+- model: web.markingsectionresponse
+  pk: 172
+  fields:
+    section: 18
+    description: "Some attempt made"
+    score: 15
+- model: web.markingsectionresponse
+  pk: 173
+  fields:
+    section: 18
+    description: "Inadequate "
+    score: 30
+- model: web.markingsectionresponse
+  pk: 174
+  fields:
+    section: 18
+    description: "Poor"
+    score: 40
+- model: web.markingsectionresponse
+  pk: 175
+  fields:
+    section: 18
+    description: "Acceptable"
+    score: 50
+- model: web.markingsectionresponse
+  pk: 176
+  fields:
+    section: 18
+    description: "Good"
+    score: 60
+- model: web.markingsectionresponse
+  pk: 177
+  fields:
+    section: 18
+    description: "Very good"
+    score: 70
+- model: web.markingsectionresponse
+  pk: 178
+  fields:
+    section: 18
+    description: "Excellent"
+    score: 80
+- model: web.markingsectionresponse
+  pk: 179
+  fields:
+    section: 18
+    description: "Outstanding"
+    score: 90
+- model: web.markingsectionresponse
+  pk: 180
+  fields:
+    section: 18
+    description: "Perfect"
+    score: 100

@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .hidden { display: none }
+</style>
+
+<script>
+
+var add_subject_button = null;
+var add_subject_disabled_msg = null;
+
+const min_desc_length = {{desc_min}}
+const min_reqs_length = {{req_min}}
+
+const char_sep_regexp = new RegExp(/\s+/gm)
+
+function disable_subjects_editor() {
+    add_subject_button.disabled = true;
+    add_subject_disabled_msg.classList.remove("hidden");
+}
+
+function update_char_count(src, target, min_chars) {
+    let text = src.value
+    let words = text.split(char_sep_regexp)
+    let char_count = 0
+    for(let i=0; i<words.length; i++) {
+        char_count += words[i].length
+    }
+    let msg = 'Character count: ' + char_count
+    if (char_count < min_chars) {
+        msg += ' (Minimum required: ' + min_chars + ')'
+    }
+    target.innerHTML = msg
+}
+
+function track_char_count(src, target, min_chars) {
+    let src_e = document.getElementById(src)
+
+    if (src_e==undefined) {
+        console.log('failed to find src element: ' + src)
+        return
+    }
+
+    let target_e = document.getElementById(target)
+    if (target_e==undefined) {
+        console.log('failed to find target element: ' + target)
+        return
+    }
+
+    src_e.addEventListener('input', ()=> {
+        update_char_count(src_e, target_e, min_chars)
+        disable_subjects_editor()
+    }, false)
+
+    update_char_count(src_e, target_e, min_chars)
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    track_char_count('id_desc','desc_count', min_desc_length)
+    track_char_count('id_reqs','reqs_count', min_reqs_length)
+    add_subject_button = document.getElementById('add_subject_button');
+    add_subject_disabled_msg = document.getElementById('add_subject_disabled_msg');
+})
+
+</script>
+
+<form class="block" method="POST">
+    {% csrf_token %}
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.title.id_for_label }}">Title</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.title.errors %}
+                    <div class="notification is-danger">{{ form.title.errors }}</div>
+                    {% endif %}
+                    <input class="input" type="text" type="text" placeholder="Project title" name="{{ form.title.html_name }}" id="{{ form.title.auto_id }}" value="{% if form.title.value %}{{ form.title.value }}{% endif %}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.mult.id_for_label }}">Multiple</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.mult.errors %}
+                    <div class="notification is-danger">{{ form.mult.errors }}</div>
+                    {% endif %}
+                    <input class="input" type="text" type="text" placeholder="Multiple" name="{{ form.mult.html_name }}" id="{{ form.mult.auto_id }}" value="{% if form.mult.value %}{{ form.mult.value }}{% endif %}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.desc.id_for_label }}">Description</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.desc.errors %}
+                    <div class="notification is-danger">{{ form.desc.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" type="text" type="text" placeholder="Description" rows="10" name="{{ form.desc.html_name }}" id="{{ form.desc.auto_id }}">{% if form.desc.value %}{{ form.desc.value }}{% endif %}</textarea>
+                    <label id="desc_count"> </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.reqs.id_for_label }}">Requirements</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.reqs.errors %}
+                    <div class="notification is-danger">{{ form.reqs.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" type="text" type="text" placeholder="Requirements" rows="10" name="{{ form.reqs.html_name }}" id="{{ form.reqs.auto_id }}">{% if form.reqs.value %}{{ form.reqs.value }}{% endif %}</textarea>
+                    <label id="reqs_count"> </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <input class="button is-primary" type="submit" value="Save changes">
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% if is_saved %}
+<section>
+    <div class="content">
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                <h3 class="block">Alter project</h3>
+            </div>
+            <div class="field-body">
+
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if is_saved and not project.draft %}
+<section class="block">
+    <div class="content">
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                
+            </div>
+            <div class="field-body">
+                <form action="{% url 'supervisor_manage_projects_draft' project.id %}" method="post">
+                    {% csrf_token %}
+                    <p>A project can be reverted back to draft status to hide it on the site.</p>
+                    <input class="block button is-primary" type="submit" value="Revert project to Draft" />
+                </form>
+            </div>
+        </div>
+        
+    </div>
+</section>
+{% endif %}
+
+{% if is_saved %}
+<section>
+    <div class="content">
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                
+            </div>
+            <div class="field-body">
+                <a href="{% url 'supervisor_manage_projects_delete' project.id %}"><button  class="button is-danger">Delete this project</button></a>
+            </div>
+        </div>
+        
+    </div>
+</section>
+{% endif %}
+
+{% if is_saved %}
+<section>
+    <div class="content">
+        
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                <h3 class="block">Edit Subjects</h3>
+            </div>
+            <div class="field-body">
+
+            </div>
+        </div>
+
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                
+            </div>
+            <div class="field-body">
+                <div class="field is-grouped is-grouped-multiline">
+                    {% for subject in project.subjects.all %}
+                    <div class="control">
+                        <div class="tags has-addons">
+                            <span class="tag is-danger">{{subject.title}}</span>
+                            <form action="{% url 'remove_subject_from_project' %}" method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="project_id" value="{{project.id}}" />
+                                <input type="hidden" name="subject_id" value="{{subject.id}}" />
+                                <input type="submit" class="tag is-delete" value="X" />
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                
+            </div>
+            <div class="field-body">
+                <div class="field is-grouped is-grouped-multiline">
+                    <form action="{% url 'add_subject_to_project' %}" method="POST">
+                        {% csrf_token %}
+                        {{add_subject_form.as_p}}
+                        <div id="add_subject_disabled_msg" class="hidden notification is-danger">Subject adding is disabled as you have changed the project information, please 'Save Changes' above to enable this again.</div>
+                        <input id="add_subject_button" class="button is-primary mb-6" type="submit" value="Add subject" />
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% else %}
+<article class="message is-info">
+    <div class="message-header">
+        <p>Info</p>
+    </div>
+    <div class="message-body">
+        <p>New projects need to be saved before subjects can be added/edited.</p>
+        <p>Once this is done an editor will appear here.</p>
+    </div>
+</article>
+{% endif %}
+{% endblock %}

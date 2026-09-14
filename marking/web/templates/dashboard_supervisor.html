@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Supervisor dashboard</h1>
+
+<section class="block">
+    <div class="columns is-multiline is-3">
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'marking_start' %}">Marking</a></h2>
+                </div>
+            </div>
+        </div>
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'briefs_app' %}">Assessment briefs</a></h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if supervisor %}
+<h1 class="block">Admin dashboard</h1>
+
+<section class="block">
+    <div class="columns is-multiline is-3">
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'marking_progress' %}">Marking overview</a></h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endif %}
+
+<section class="block">
+    <a href="{% url 'docs' %}">Documentation</a>
+</section>
+
+{% endblock %}

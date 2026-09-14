@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Reject request</h1>
+<p class="block"><strong>Project:</strong> {{req.project.title}}</p>
+<p class="block"><strong>Student:</strong> {{req.student.username}}</p>
+
+<form method="POST" action="{% url 'supervisor_manage_request_reject' req.id %}?verify={{req.id}}">
+    {% csrf_token %}
+
+    <div class="field">
+        <label class="label" for="label_reason">Reason for rejection:</label>
+        <div class="control">
+            <textarea class="textarea" placeholder="Your statement here" name="reason" id="label_reason" readonly="readonly">{{reason}}</textarea>
+        </div>
+    </div>
+
+    <div class="field">
+        <div class="control">
+            <input class="button is-danger" type="submit" value="Reject this student" />
+        </div>
+    </div>
+</form>
+
+{% endblock %}

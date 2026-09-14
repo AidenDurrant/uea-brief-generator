@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    td.primary {font-weight: bolder;}
+    .hidden { display: none }
+</style>
+
+<script>
+const char_sep_regexp = new RegExp(/\s+/gm)
+
+function update_char_count(src, target, min_chars) {
+    let text = src.value
+    let words = text.split(char_sep_regexp)
+    let char_count = 0
+    for(let i=0; i<words.length; i++) {
+        char_count += words[i].length
+    }
+    let msg = 'Character count: ' + char_count
+    if (char_count < min_chars) {
+        msg += ' (Minimum required: ' + min_chars + ')'
+    }
+    target.innerHTML = msg
+}
+
+function track_char_count(src, target, min_chars) {
+    let src_e = document.getElementById(src)
+
+    if (src_e==undefined) {
+        console.log('failed to find src element: ' + src)
+        return
+    }
+
+    let target_e = document.getElementById(target)
+    if (target_e==undefined) {
+        console.log('failed to find target element: ' + target)
+        return
+    }
+
+    src_e.addEventListener('input', ()=> {
+        update_char_count(src_e, target_e, min_chars)
+    }, false)
+
+    update_char_count(src_e, target_e, min_chars)
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    track_char_count('comments','comments_count', 500)
+    add_subject_button = document.getElementById('add_subject_button');
+    add_subject_disabled_msg = document.getElementById('add_subject_disabled_msg');
+})
+
+</script>
+
+<section class="block">
+    <div class="content">
+        <h1 class="block">Combined/final Grading</h1>
+        <p>
+            <strong>For:</strong> <a href="{% url 'marking_student' student.id %}">{{student.gn}} {{student.fn}} ({{student.stu_num}})</a><br>
+            <strong>On:</strong> {{combined_result.combined.name}}
+        </p>
+
+        <p>This page shows the marks given by each marker for each assignment.<br>
+        In the final mark column you can enter the decided grade.<br>
+        You can also click on the marks in the columns under each name to see the full assignment marking page.<br>
+        Once you&apos;ve finished click the save button.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Assignment</th>
+                        {% for marker in markers %}
+                        <th>{{marker.dn}}</th>
+                        {% endfor %}
+                        <th>Final</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for part in parts %}
+                    <tr>
+                        <td>{{part.assignment.description}}</td>
+                        {% for g in part.gradings %}
+                            <td class="{% if g.primary %}primary{% endif %}">{% if g %}<a href="{% url 'marking_sections' g.student.id g.id %}">{{g.total}}</a>{% else %}No mark sheet{% endif %}</td>
+                        {% endfor %}
+                        <td><input aria-label="Mark for assignment {{part.assignment.description}}" type="text" id="part_{{part.assignment.id}}" name="part_{{part.assignment.id}}" value="{{part.mark}}"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <label for="comments">Comments:</label><br>
+            {% if form.comments.errors %}
+            <div class="notification is-danger">{{ form.comments.errors }}</div>
+            {% endif %}
+            <textarea id="comments" rows="12" cols="80" name="comments">{{comments}}</textarea>
+            <br>
+            <label class="block" id="comments_count"> </label>
+
+            {% if combined_result.combined.verify_question %}
+            <p class="block mt-3">
+                <h3 class="title-3">Confirmation statement</h3>
+                <p>Before the final marks can be submitted you need to read and confirm you have completed the following step.</p>
+                <input type="checkbox" id="verify_question" name="verify_question"></input><label class="ml-2" for="verify_question">{{combined_result.combined.verify_question}}</label>
+            </p>
+            {% endif %}
+
+            <p>
+                <input class="submit button is-primary" type="submit" value="Save">
+            </p>
+        </form>
+    </div>
+
+    <p class="block"><a class="button" href="{% url 'download_final_pdf' combined_result.id %}">Download mark sheet PDF</a></p>
+    <p class="block"><a class="button" href="{% url 'download_detailed_report_pdf' combined_result.id %}">Download mark sheet PDF with detailed report</a></p>
+</section>
+{% endblock %}

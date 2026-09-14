@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Create own project</h1>
+
+<form class="block" method="POST">
+    {% csrf_token %}
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.title.id_for_label }}">Title</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.title.errors %}
+                    <div class="notification is-danger">{{ form.title.errors }}</div>
+                    {% endif %}
+                    <input class="input" type="text" type="text" placeholder="Project title" name="{{ form.title.html_name }}" id="{{ form.title.auto_id }}" value="{% if form.title.value %}{{ form.title.value }}{% endif %}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal"></div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <label class="label" for="{{ form.desc.id_for_label }}">Please describe your project covering the background, final outcome and objectives
+                        (max. 1500 chars):</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal"></div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.desc.errors %}
+                    <div class="notification is-danger">{{ form.desc.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" type="text" type="text" rows="10" name="{{ form.desc.html_name }}" id="{{ form.desc.auto_id }}">{% if form.desc.value %}{{ form.desc.value }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal"></div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <label class="label" for="{{ form.support.id_for_label }}">Please provide information on your industrial/commercial support and/or CMP supervisor
+                        that have approved/suggested your project (max. 200 chars):</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal"></div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.support.errors %}
+                    <div class="notification is-danger">{{ form.support.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" type="text" type="text" rows="10" name="{{ form.support.html_name }}" id="{{ form.support.auto_id }}">{% if form.support.value %}{{ form.support.value }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <input class="button is-primary" type="submit" value="Submit project">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="hidden" name="verify" value="{{form.verify.value}}" />
+</form>
+
+{% if is_saved %}
+<section>
+    <div class="content">
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                <h3 class="block">Alter project</h3>
+            </div>
+            <div class="field-body">
+
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if is_saved and not project.draft %}
+<section class="block">
+    <div class="content">
+        <div class="field is-horizontal">
+            <div class="field-label is-normal">
+                
+            </div>
+            <div class="field-body">
+                <form action="{% url 'supervisor_manage_projects_draft' project.id %}" method="post">
+                    {% csrf_token %}
+                    <p>A project can be reverted back to draft status to hide it on the site.</p>
+                    <input class="block button is-primary" type="submit" value="Revert project to Draft" />
+                </form>
+            </div>
+        </div>
+        
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}

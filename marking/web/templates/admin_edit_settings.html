@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Site settings</h1>
+
+{% if msg %}
+<div class="notification is-primary">{{msg}}</div>
+{% endif %}
+
+<form class="block" method="POST">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            {{ field }}
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <label class="label" for="{{ field.id_for_label }}">{{field.label}}</label>
+                    {% if field.errors %}
+                    <div class="notification is-danger">{{ field.errors }}</div>
+                    {% endif %}
+                    {% if field.help_text %}
+                    <div class="notification">{{field.help_text}}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="block mt-6 field is-horizontal">
+        <div class="field-label is-normal">
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <div class="notification is-info">
+                        Changes to settings can take up to a minute to apply to all users.
+                    </div>
+
+                    <input type="submit" class="button is-danger" value="Save changes" />
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endblock %}

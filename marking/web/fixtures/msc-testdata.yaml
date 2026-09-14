@@ -1,0 +1,28 @@
+- model: web.markingcombinedgrading
+  pk: 1
+  fields:
+    name: MSc Project
+    pdf_header_1: MSc Project
+    pdf_header_2: "ASSIGNMENT TITLE: PORTFOLIO (001) and INSPECTION (002)"
+- model: web.markingcombinedcomponent
+  pk: 1
+  fields:
+    combined: 1
+    assignment: 1
+    order: 5
+- model: web.markingcombinedcomponent
+  pk: 2
+  fields:
+    combined: 1
+    assignment: 2
+    order: 10
+- model: web.markingassignment
+  pk: 1
+  fields:
+    description: Final year project report
+    short_title: Portfolio (002b)
+- model: web.markingassignment
+  pk: 2
+  fields:
+    description: Final year project inspection
+    short_title: Demo (003b)

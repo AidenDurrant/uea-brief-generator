@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Grading {{student.gn}} {{student.fn}} ({{student.stu_num}})</h1>
+
+        <p>These are the current assignments and final gradings we have for the student.</p>
+        <p>If you&apos;re about to start marking click the 'New assignment marking' button and pick an assignment.</p>
+
+        <h2 class="block">Assignments</h2>
+        <ul>
+            {% for grading in gradings %}
+            <li><a href="{% url 'marking_sections' student.id grading.id %}">{{grading.assignment.description}} - {{grading.marker}}  {% if grading.completed %}<strong>(COMPLETED)</strong>{% endif %}</a></li>
+            {% endfor %}
+        </ul>
+
+        <p>
+            <a href="{% url 'marking_new' student.id %}"><button class="button is-primary">New assignment marking</button></a>
+        </p>
+
+        <h2 class="block">Final grade sheet generation</h2>
+
+        <p>Use this option to generate a PDF final grade sheet for the chosen assignment which you can upload to Blackboard.</p>
+        <p>Start by clicking the 'New final/combined marking' button to pick the assignment that you want.</p>
+        <p>You can then decide the final mark for the assignment, add your final comments, and save the result as a PDF.</p>
+        <p>In case the assignment requires a second marker, once you and the second marker have both completed the marking, you can also use this option to decide on the final grade. The final grade sheet will then show the combined total mark from each assignment (and marker) that makes up the combined result, plus the detailed comments from the two markers.</p>
+        
+        <ul>
+            {% for entry in combined_entries %}
+            <li><a href="{% url 'marking_combined_result' student.id entry.id %}">{{entry.combined.name}} {% if entry.completed %}<strong>(COMPLETED)</strong>{% endif %}</a></li>
+            {% endfor %}
+        </ul>
+
+        <p>
+            <a href="{% url 'marking_new_combined' student.id %}"><button class="button is-primary">New final/combined marking</button></a>
+        </p>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Subjects</h1>
+
+<div class="columns is-multiline is-3">
+    {% for subject in subjects %}
+    <div class="column is-one-third">
+        <div class="card">
+            <div class="card-content">
+                <h2><a href="{% url 'projects_in_subject' subject.id %}">{{subject.title}}</a></h2>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

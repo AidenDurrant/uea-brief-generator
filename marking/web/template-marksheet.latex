@@ -1,0 +1,54 @@
+\documentclass[a4paper]{article}
+\usepackage[english]{babel}
+\usepackage{setspace}
+%\usepackage{showframe}
+\usepackage[margin=1.6cm]{geometry}
+\renewcommand{\familydefault}{\sfdefault}
+\begin{document}
+
+\begin{center}
+    \begin{tabular}{p{8.2cm} p{8.2cm}}
+        {{REPORT_TITLE}} & \rightline{UNIVERSITY OF EAST ANGLIA} \\
+        & \rightline{School of Computing Sciences} \\
+    \end{tabular}
+\end{center}
+
+\begin{center}
+    \begin{tabular}{p{8.2cm} p{8.2cm}}
+    \multicolumn{2}{p{16cm}}{{{HEADER_1}}} \\
+    \\
+    \multicolumn{2}{p{16cm}}{{{HEADER_2}}} \\
+    \\
+    \\
+    Student Name: {{NAME}} & Student ID: {{STU_ID}} \\
+    \\
+    First marker: {{FIRST_MARKER}} &  \\
+    \\
+    Second marker (if applicable): {{SECOND_MARKER}} &  \\
+    \\
+    Date: {{DATE}} \\
+    \end{tabular}
+\end{center}
+
+\begin{center}
+    \begin{tabular}{| p{4.5cm} | p{3.5cm} | p{3.5cm} | p{3.5cm} |}
+        \hline
+        {{MARKS_TABLE}}
+    \end{tabular}
+\end{center}
+
+\vspace{1cm}
+
+{\Huge Overall Comments} \\
+
+\begin{center}
+    \begin{tabular}{p{15cm}}
+        {{COMMENTS}} \\
+    \end{tabular}
+\end{center}
+
+\vspace{1cm}
+
+{{DETAILED_COMMENTS}}
+
+\end{document}

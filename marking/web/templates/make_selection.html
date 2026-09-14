@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+<h1 class="block">Select project</h1>
+
+<h2 class="block">Title: {{project.title}}</h2>
+<p><strong>Supervisor:</strong> <a href="{% url 'supervisor_info' project.supervisor.id %}">{{project.supervisor.dn}}</a></p>
+</section>
+
+<section class="block">
+<form method="POST">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="field">
+        <label class="label" for="{{ form.statement.id_for_label }}">Please provide a short statement why you believe this is the right project for you (max. 1000 chars):</label>
+        <div class="control">
+            {% if form.statement.errors %}
+            <div class="notification is-danger">{{ form.statement.errors }}</div>
+            {% endif %}
+            <textarea class="textarea" placeholder="Your statement here" name="{{ form.statement.html_name }}" id="{{ form.statement.auto_id }}" rows="10" >{% if form.statement.value %} {{ form.statement.value }} {% endif %}</textarea>
+        </div>
+    </div>
+
+    <div class="field">
+        <label class="label" for="{{ form.reqs.id_for_label }}">If the project has prerequisites, please address these below (max. 250 chars):</label>
+        <div class="control">
+            {% if form.reqs.errors %}
+            <div class="notification is-danger">{{ form.reqs.errors }}</div>
+            {% endif %}
+            <textarea class="textarea" placeholder="Your statement here" name="{{ form.reqs.html_name }}" id="{{ form.reqs.auto_id }}" rows="10" >{% if form.reqs.value %} {{ form.reqs.value }} {% endif %}</textarea>
+        </div>
+    </div>
+
+    <div class="field">
+        <div class="control">
+          <input class="button is-primary is-large" type="submit" value="Request this project" />
+        </div>
+      </div>
+    
+</form>
+</section>
+
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Accept request</h1>
+<p class="block"><strong>Project:</strong> {{req.project.title}}</p>
+<p class="block"><strong>Student:</strong> {{req.student.username}}</p>
+
+<form method="POST" action="{% url 'supervisor_manage_request_accept' req.id %}?verify={{req.id}}">
+    {% csrf_token %}
+    <div class="field">
+        <div class="control">
+            <input class="button is-success" type="submit" value="Yes, I&apos;m sure" />
+        </div>
+    </div>
+</form>
+
+{% endblock %}

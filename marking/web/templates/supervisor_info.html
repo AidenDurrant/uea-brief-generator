@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <h1 class="block">{{person.dn}}</h1>
+
+    <h2 class="block">Bio</h2>
+    <div>
+        {{person.bio}}
+    </div>
+</section>
+
+<section class="block">
+    <h2 class="block">Projects</h3>
+
+    <table class="table is-striped is-fullwidth">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Multiplicity</th>
+                <th>Requests</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for project in projects %}
+            <tr>
+                <td><a href="{% url 'project_info' project.id%}">{{project.title}}</a></td>
+                <td>{{project.mult}}</td>
+                <td>{{project.requests.all|length}}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        </table>
+</section>
+
+{% endblock %}

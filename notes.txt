@@ -1,0 +1,70 @@
+Bugs
+---
+X Gives 500 on unknown supervisor account some-times.
+X No option to add a student
+
+Fixes
+---
+Until unique on MarkingGradingEntry is added you can find the issue with:
+select * from web_markinggradingentry where grading_id=229;
+Then just: delete from web_markinggradingentry where id=9999999;
+
+Marking system
+---
+MSc default confirmation statement:
+I confirm that the dissertation report was discussed with student in the viva and that the outcome of this discussion is reflected in the marks given for the report
+
+* big change to section marking...
+    Rather than having the marks done by selecting the rubric entries, instead just show them
+    and have a slider with 5% markings.
+    Maybe have it so you can click and entry, which highlights and moves the slider.
+    As well have it so moving the slider updates the highlight.
+* build a final comments page, which has a side by side layout.
+    Have tabs on for each report, and a button to copy the text into the current comment area.
+* have a default/source comments bit on the combined page that pulls all of the previous comments into a block so they can
+    be easily copy+paste into the final one.
+* export system
+* Add unique constraing of grading,section on MarkingGradingEntry
+    This prevents dups that occur due to JS and form concurrent POSTs.
+    Will need to modify both views to catch this and yell.
+    Testing could be interesting.
+* add comments to combined grading page (500 chars)
+X make other supervisors grades read-only for others
+X merge page
+    for each student they'll be report(pri),report(sec),demo(pri),demo(sec)
+    need a overview page that combines this and lets them pick a final mark
+    it can default to an average, but it should be adjustable
+
+    E.g.
+                Marker1     Marker2     Final
+    Report      55          65          60
+    Demo        60          70          65
+
+* pdf export
+
+To see combined directly in the database:
+select web_markingcombinedresult.id, web_markingcombinedresult.marks, min(stu.gn), min(stu.fn), min(grad.id), string_agg(supervisor.dn,',')
+from web_markingcombinedresult
+join web_markingstudent stu
+on stu.id=web_markingcombinedresult.student_id
+join web_markinggrading grad
+on grad.student_id=stu.id
+join web_supervisor supervisor
+on grad.marker_id=supervisor.id
+where web_markingcombinedresult.marks is not null
+group by web_markingcombinedresult.id
+order by min(stu.gn),min(stu.fn);
+
+SQL reference
+===
+
+New year clean up
+---
+delete from web_projectrequest;
+delete from web_student;
+delete from web_project where supervisor_id is null;
+
+
+New assignment importer
+===
+Move away from using Django's fixtures to do this and instead have a simple text format to do this.

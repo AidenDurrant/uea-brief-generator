@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="block">Reallocate request to alternative supervisor</h1>
+
+{% if msg %}
+<div class="notification is-primary">{{msg}}</div>
+{% endif %}
+
+<p class="block">
+    <strong>Title:</strong> {{req.project.title}}<br >
+    <strong>Project submitter:</strong> {{req.project.supervisor}}<br >
+    <strong>Request supervisor:</strong> {{req.supervisor}}<br >
+</p>
+
+<form method="POST" class="form block">
+    {% csrf_token %}
+    {{form.as_p}}
+    <input type="submit" class="button submit is-primary block" value="Re-allocate to this supervisor">
+</form>
+
+{% endblock %}

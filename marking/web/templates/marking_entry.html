@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    #entry_slider_score { width: 95%; margin: 1rem 5% 1rem 1rem }
+</style>
+<script>
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken')
+
+let api_url = "{{api_url}}/api/";
+
+var slider_element = null;
+var slider_value_element = null;
+var entry_table = null;
+var last_entry_id = null;
+
+async function save_change(entry_id, score) {
+    let url = api_url + entry_id + '?score=' + score;
+    slider_element.value = score;
+    slider_value_element.innerHTML = score.toString();
+
+    update_highlight(score);
+
+    const resp = await fetch(url,
+        {
+            method:'POST',
+            mode:'cors',
+            cache:'no-cache',
+            credentials:'same-origin',
+            headers: {
+                'X-CSRFToken': csrftoken,
+            }
+        }
+    )
+}
+
+function update_highlight(score) {
+    let rows = entry_table.getElementsByTagName('tr');
+    let target = null;
+    for(let i=0; i<rows.length; i++) {
+        let row_score = parseInt(rows[i].dataset.score);
+        if (score >= row_score) {
+            target = rows[i];
+        }
+        if (rows[i].classList.contains('is-selected')) {
+            rows[i].classList.remove('is-selected');
+            let inputs = rows[i].getElementsByTagName('input');
+            for (let j=0; j<inputs.length; j++) {
+                if (inputs[j].type == 'radio') {
+                    inputs[j].checked = false;
+                }
+            }
+        }
+    }
+
+    target.classList.add('is-selected');
+    let inputs = target.getElementsByTagName('input');
+    for (let j=0; j<inputs.length; j++) {
+        if (inputs[j].type == 'radio') {
+            inputs[j].checked = true;
+        }
+    }
+
+    return target.dataset.id;
+}
+
+document.addEventListener("DOMContentLoaded", (event) => {
+    slider_element = document.getElementById('entry_slider_score');
+    slider_value_element = document.getElementById('slider_value');
+    entry_table = document.getElementById('entry_table');
+
+    slider_element.addEventListener('input', (event) => {
+        slider_value_element.innerHTML = slider_element.value;
+        last_entry_id = update_highlight(slider_element.value);
+    });
+
+    slider_element.addEventListener('change', (event) => {
+        save_change(last_entry_id, parseInt(slider_value_element.innerHTML));
+    })
+});
+
+</script>
+
+<section class="block">
+    <div class="content">
+        <h1 class="block">Grading {{grading.assignment.description}}</h1>
+        <div class="block">
+            <p>For <a href="{% url 'marking_student' student.id %}">{{student.gn}} {{student.fn}} ({{student.stu_num}})</a><br>
+            By {{grading.marker}}</p>
+        </div>
+
+        <h2 class="block"><a href="{% url 'marking_sections' student.id grading.id %}">Overall</a> / {{section.description}}</h2>
+
+        <p>Here you can pick the mark you wish to assign for this section.<br>
+        If you have already entered a value the row will be highlighted.<br>
+        You can also add extra comments about this section if you wish.<br>
+        <br>
+        <strong>Once you&apos;ve made you choice click the save button.</strong></p>
+
+        <form method="post" action="{% url 'marking_entry' student.id grading.id section.id %}">
+        {% csrf_token %}
+        <label for="entry_slider_score">Precise mark:</label><span><strong id="slider_value">{{slider_score}}</strong></span><br>
+        <input class="block" id="entry_slider_score" type="range" min="0" max="100" step="5" name="slider_score" value="{{slider_score}}">
+        <table class="table" id="entry_table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Mark</th>
+                </tr>
+            </thead>
+            <tbody>
+                <fieldset>
+                {% for response in responses %}
+                <tr class="{% if response.selected %}is-selected{% endif %}" data-score="{{response.info.score}}" data-id="{{response.info.id}}">
+                    <td>{{response.info.description}}</td>
+                    <td>
+                        <label for="entry_{{response.info.id}}">{{response.info.score}} %</label>
+                        <input id="entry_{{response.info.id}}" type="radio" name="response" value="{{response.info.id}}" onchange="save_change('{{response.info.id}}',{{response.info.score}})" {% if response.selected %}checked{% endif %}>
+                    </td>
+                </tr>
+                {% endfor %}
+                </fieldset>
+            </tbody>
+        </table>
+
+        <label for="comment">Comments:</label>
+        <textarea id="comment" class="textarea block" name="comment">{{comment}}</textarea>
+        <input class="submit button is-primary" type="submit" value="Save Comments">
+        </form>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <p class="block">These are the student we found that match your query:</p>
+        <ul class="block">
+        {% for student in results %}
+            <li><a href="{% url 'marking_student' student.id %}">{{student.gn}} {{student.fn}} ({{student.stu_num}}) - Supervisor: {{student.supervisor}}</a></li>
+        {% endfor %}
+        </ul>
+        <p class="block">If you can not find the student you want you can add them yourself.</p>
+        <a href="{% url 'add_student' %}"><button class="button is-success">Add a student</button></a>
+    </div>
+</section>
+{% endblock %}

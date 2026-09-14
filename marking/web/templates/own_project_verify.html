@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .hidden { display: none }
+</style>
+
+<h1 class="block">Are you sure you wish to submit this project?</h1>
+
+<p class="block">Please check the details below, if there are any errors please use the back button to edit them.</p>
+
+<form class="block" method="POST">
+    {% csrf_token %}
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.title.id_for_label }}">Title</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <input class="input" readonly="readonly" type="text" type="text" name="{{ form.title.html_name }}" id="{{ form.title.auto_id }}" value="{% if form.title.value %}{{ form.title.value }}{% endif %}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.desc.id_for_label }}">Project description:</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <textarea class="textarea" readonly="readonly" type="text" type="text" rows="10" name="{{ form.desc.html_name }}" id="{{ form.desc.auto_id }}">{% if form.desc.value %}{{ form.desc.value }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            <label class="label" for="{{ form.support.id_for_label }}">Support information:</label>
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    {% if form.support.errors %}
+                    <div class="notification is-danger">{{ form.support.errors }}</div>
+                    {% endif %}
+                    <textarea class="textarea" readonly="readonly" type="text" type="text" rows="10" name="{{ form.support.html_name }}" id="{{ form.support.auto_id }}">{% if form.support.value %}{{ form.support.value }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field is-horizontal">
+        <div class="field-label is-normal">
+            
+        </div>
+        <div class="field-body">
+            <div class="field">
+                <div class="control">
+                    <input class="button is-primary" type="submit" value="Yes, I&apos;m sure I want to submit this request">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="hidden" name="verify" value="{{form.verify.value}}" />
+
+</form>
+
+{% endblock %}

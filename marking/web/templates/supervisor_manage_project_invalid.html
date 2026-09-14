@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <h1 class="block">Invalid project</h1>
+
+    <p class="block">The project has been saved, but it does not currently meet the requirements to become available.</p>
+    <p class="block">Once the issue{% if errors|length > 1 %}s{% endif %} below have been corrected it will move out of draft status.</p>
+
+    <ul class="block">
+        {% for err in errors %}
+        <li>{{err}}</li>
+        {% endfor %}
+    </ul>
+
+    <a class="block" href="{% url 'supervisor_manage_projects_edit' project_id %}"><button  class="button is-primary">Edit project</button></a>
+</section>
+{% endblock %}

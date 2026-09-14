@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">New combined/final grading {{student.gn}} {{student.fn}} ({{student.stu_num}})</h1>
+
+        <ul>
+            {% for entry in combined %}
+            <li>
+                <form method='post'>
+                    {% csrf_token %}
+                    <label>{{entry.name}}</label>
+                    <input type="hidden" name="entry" value="{{entry.id}}">
+                    <input class="submit button is-primary" type="submit" value="New">
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endblock %}

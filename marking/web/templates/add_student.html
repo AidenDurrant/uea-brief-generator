@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">Marking</h1>
+        <h3 class="block">Add student</h3>
+        <form class="block" method="post">
+            {% csrf_token %}
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="{{ form.gn.id_for_label }}">Given name</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            {% if form.gn.errors %}
+                            <div class="notification is-danger">{{ form.gn.errors }}</div>
+                            {% endif %}
+                            <input class="input" type="text" type="text" placeholder="First name" name="{{ form.gn.html_name }}" id="{{ form.gn.auto_id }}" value="{% if form.gn.value %}{{ form.gn.value }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="{{ form.fn.id_for_label }}">Family name</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            {% if form.fn.errors %}
+                            <div class="notification is-danger">{{ form.fn.errors }}</div>
+                            {% endif %}
+                            <input class="input" type="text" type="text" placeholder="Surname" name="{{ form.fn.html_name }}" id="{{ form.fn.auto_id }}" value="{% if form.fn.value %}{{ form.fn.value }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="{{ form.sid.id_for_label }}">Student number</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            {% if form.sid.errors %}
+                            <div class="notification is-danger">{{ form.sid.errors }}</div>
+                            {% endif %}
+                            <input class="input" type="text" type="text" placeholder="000000" name="{{ form.sid.html_name }}" id="{{ form.sid.auto_id }}" value="{% if form.sid.value %}{{ form.sid.value }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" for="{{ form.supervisor.id_for_label }}">Supervisor</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            {% if form.supervisor.errors %}
+                            <div class="notification is-danger">{{ form.supervisor.errors }}</div>
+                            {% endif %}
+                            <input class="input" type="text" type="text" name="{{ form.supervisor.html_name }}" id="{{ form.supervisor.auto_id }}" value="{% if form.supervisor.value %}{{ form.supervisor.value }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="field is-horizontal">
+                <div class="field-label is-normal"></div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="button submit is-primary" type="submit" value="Create student">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </form>
+    </div>
+</section>
+{% endblock %}

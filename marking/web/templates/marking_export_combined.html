@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="block">
+    <div class="content">
+        <h1 class="block">New combined/final grading {{student.gn}} {{student.fn}} ({{student.stu_num}})</h1>
+
+        <table>
+            <tbody>
+                {% for row in report %}
+                <tr>
+                    {% for col in row %}
+                    <td>{{col}}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

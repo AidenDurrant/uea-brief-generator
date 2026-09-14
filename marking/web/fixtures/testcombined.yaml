@@ -1,0 +1,265 @@
+- model: web.markingcombinedgrading
+  pk: 1
+  fields:
+    name: 3YP
+
+- model: web.markingcombinedcomponent
+  pk: 1
+  fields:
+    combined: 1
+    assignment: 1
+    order: 10
+- model: web.markingcombinedcomponent
+  pk: 2
+  fields:
+    combined: 1
+    assignment: 2
+    order: 20
+
+- model: web.markinggrading
+  pk: 1
+  fields:
+    assignment: 1
+    rubric: 1
+    marker: 1
+    student: 1
+    primary: true
+    completed: true
+    comments: ''
+- model: web.markinggrading
+  pk: 2
+  fields:
+    assignment: 1
+    rubric: 1
+    marker: 28
+    student: 1
+    primary: false
+    completed: true
+    comments: ''
+- model: web.markinggrading
+  pk: 3
+  fields:
+    assignment: 2
+    rubric: 2
+    marker: 1
+    student: 1
+    primary: true
+    completed: true
+    comments: ''
+- model: web.markinggradingentry
+  pk: 1
+  fields:
+    grading: 1
+    section: 1
+    response: 6
+    comment: ''
+- model: web.markinggradingentry
+  pk: 2
+  fields:
+    grading: 1
+    section: 2
+    response: 14
+    comment: ''
+- model: web.markinggradingentry
+  pk: 3
+  fields:
+    grading: 1
+    section: 3
+    response: 25
+    comment: ''
+- model: web.markinggradingentry
+  pk: 4
+  fields:
+    grading: 1
+    section: 4
+    response: 37
+    comment: ''
+- model: web.markinggradingentry
+  pk: 5
+  fields:
+    grading: 1
+    section: 5
+    response: 45
+    comment: ''
+- model: web.markinggradingentry
+  pk: 6
+  fields:
+    grading: 1
+    section: 6
+    response: 55
+    comment: ''
+- model: web.markinggradingentry
+  pk: 7
+  fields:
+    grading: 1
+    section: 7
+    response: 66
+    comment: ''
+- model: web.markinggradingentry
+  pk: 8
+  fields:
+    grading: 1
+    section: 8
+    response: 75
+    comment: ''
+- model: web.markinggradingentry
+  pk: 9
+  fields:
+    grading: 1
+    section: 9
+    response: 84
+    comment: ''
+- model: web.markinggradingentry
+  pk: 10
+  fields:
+    grading: 1
+    section: 10
+    response: 94
+    comment: ''
+- model: web.markinggradingentry
+  pk: 11
+  fields:
+    grading: 1
+    section: 11
+    response: 105
+    comment: ''
+- model: web.markinggradingentry
+  pk: 12
+  fields:
+    grading: 1
+    section: 12
+    response: 115
+    comment: ''
+- model: web.markinggradingentry
+  pk: 13
+  fields:
+    grading: 1
+    section: 13
+    response: 126
+    comment: ''
+- model: web.markinggradingentry
+  pk: 14
+  fields:
+    grading: 2
+    section: 1
+    response: 5
+    comment: ''
+- model: web.markinggradingentry
+  pk: 15
+  fields:
+    grading: 2
+    section: 2
+    response: 16
+    comment: ''
+- model: web.markinggradingentry
+  pk: 16
+  fields:
+    grading: 2
+    section: 3
+    response: 23
+    comment: ''
+- model: web.markinggradingentry
+  pk: 17
+  fields:
+    grading: 2
+    section: 4
+    response: 34
+    comment: ''
+- model: web.markinggradingentry
+  pk: 18
+  fields:
+    grading: 2
+    section: 5
+    response: 45
+    comment: ''
+- model: web.markinggradingentry
+  pk: 19
+  fields:
+    grading: 2
+    section: 6
+    response: 54
+    comment: ''
+- model: web.markinggradingentry
+  pk: 20
+  fields:
+    grading: 2
+    section: 7
+    response: 64
+    comment: ''
+- model: web.markinggradingentry
+  pk: 21
+  fields:
+    grading: 2
+    section: 8
+    response: 76
+    comment: ''
+- model: web.markinggradingentry
+  pk: 22
+  fields:
+    grading: 2
+    section: 9
+    response: 85
+    comment: ''
+- model: web.markinggradingentry
+  pk: 23
+  fields:
+    grading: 2
+    section: 10
+    response: 95
+    comment: ''
+- model: web.markinggradingentry
+  pk: 24
+  fields:
+    grading: 2
+    section: 11
+    response: 105
+    comment: ''
+- model: web.markinggradingentry
+  pk: 25
+  fields:
+    grading: 2
+    section: 12
+    response: 116
+    comment: ''
+- model: web.markinggradingentry
+  pk: 26
+  fields:
+    grading: 2
+    section: 13
+    response: 124
+    comment: ''
+- model: web.markinggradingentry
+  pk: 27
+  fields:
+    grading: 3
+    section: 14
+    response: 135
+    comment: ''
+- model: web.markinggradingentry
+  pk: 28
+  fields:
+    grading: 3
+    section: 15
+    response: 144
+    comment: ''
+- model: web.markinggradingentry
+  pk: 29
+  fields:
+    grading: 3
+    section: 16
+    response: 154
+    comment: ''
+- model: web.markinggradingentry
+  pk: 30
+  fields:
+    grading: 3
+    section: 17
+    response: 166
+    comment: ''
+- model: web.markinggradingentry
+  pk: 31
+  fields:
+    grading: 3
+    section: 18
+    response: 176
+    comment: ''

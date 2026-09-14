@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+
+{% if projects_hidden %}
+<div class="notification is-info">
+    <p>Projects are currently hidden, the project supervisor will tell you when they will next be available to view.</p>
+</div>
+{% endif %}
+
+{% if requests_readonly %}
+<div class="notification is-info">
+    <p>Your requests are being processed so you can not create or delete them.</p>
+</div>
+{% endif %}
+
+<section class="block">
+    <div class="columns is-multiline is-3">
+        {% if not projects_hidden %}
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'projects' %}">See all projects</a></h2>
+                </div>
+            </div>
+        </div>
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'subjects' %}">See subjects</a></h2>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="column is-one-third">
+            <div class="card">
+                <div class="card-content">
+                    <h2><a href="{% url 'requests' %}">My requests</a></h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

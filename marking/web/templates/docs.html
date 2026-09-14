@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="block">Documentation</h1>
+
+<p class="block">This is some documentation about the system, what the general process is, and how things work underneath.</p>
+
+<h2 class="block">Full life-cycle of a request</h2>
+<ol class="block">
+    <li class="block">Student logs in, selects the project(s) they want and submits a formal request .<br>
+    This create a new request object in the database, per project, with a status of 'NEW', and a decision of 'ON-HOLD'.
+    </li>
+    <li class="block">Project supervisors log in and view their requests.<br>
+    They can set the decision on each one to accept or reject, and rejecting requires an explanation to be provided.<br>
+    This moves the request to the 'PROCESSED' state.<br>
+    The student is not informed of any change at this point.
+    </li>
+    <li class="block">An administrator logs in and views all processed requests.<br>
+    If they agree with the decision they mark the request as verified and its state changes to 'VERIFIED'<br>
+    If not they can discuss with the supervisor.<br>
+    The student is not informed of any change at this point.
+    </li>
+    <li class="block">Once all the requests in a round have been dealt with an administrator can release the responses to the students.<br>
+    This emails any student that has a request in the 'VERIFIED' state telling them there has been change, and they should
+    log into the site to view it.<br>
+    This changes the state of the request to 'COMPLETED'.<br>
+    Any requests that have not been verified stay in the state they are in.
+    </li>
+</ol>
+
+{% if is_admin %}
+<h1 class="block">Administrator Information</h1>
+
+<p class="block">This is some information that users with administrative privileges on the system will find useful.</p>
+
+<h2 class="block">Request processing</h2>
+
+<p class="block">The various views let you push requests through, and change decisions.</p>
+
+<p class="block">&apos;<a href="{% url 'admin_all_requests' %}">See all requests</a>&apos; has a various filters available at the top of the page.<br>
+The 'New' filter shows you all the requests that supervisors have yet to processes.<br>
+On this page you can use the &apos;Move to On-Hold for supervisor&apos; button to make an unprocessed request appear in the &apos;<a href="{% url 'admin_view_responses' %}">Verify supervisor responses</a>&apos; page where you can edit it further.</p>
+
+{% endif %}
+
+{% endblock %}
