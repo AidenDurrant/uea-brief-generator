@@ -7,6 +7,12 @@ __pycache__/
 *.log
 /marking/*.dll
 
+# Virtualenvs. Not left to the self-ignore file that `python -m venv` writes,
+# which only covers a venv created that way and under that name.
+.venv/
+venv/
+env/
+
 # Marking site generated output
 *.pdf
 *.csv
