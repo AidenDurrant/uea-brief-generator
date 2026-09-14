@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -16,9 +17,16 @@ import remarkMath from "remark-math";
 import type { Database, Json } from "@/lib/database.types";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { AppHeader } from "@/app/components/app-header";
+import {
+  BriefDocument,
+  briefDocumentDataFromContent,
+  measurePrintPageCount,
+} from "@/app/components/brief-document";
 
 type QueueRow =
   Database["public"]["Functions"]["review_queue"]["Returns"][number];
+type ReviewStatusRow =
+  Database["public"]["Functions"]["assessment_review_status"]["Returns"][number];
 type AuthState = "loading" | "signed-out" | "authenticated";
 type ReviewStage = "checker" | "cluster_lead";
 type JsonRecord = { [key: string]: Json | undefined };
@@ -472,6 +480,14 @@ export default function ReviewPage() {
   const [comment, setComment] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reviewStatuses, setReviewStatuses] = useState<ReviewStatusRow[]>([]);
+  // Administrators and Teaching Directors oversee every brief, so they get the
+  // document itself rather than only this page's structured summary.
+  const [hasOversight, setHasOversight] = useState(false);
+  const [isDocumentOpen, setIsDocumentOpen] = useState(false);
+  const [documentZoom, setDocumentZoom] = useState(70);
+  const [printPageCount, setPrintPageCount] = useState(1);
+  const documentPageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -503,6 +519,25 @@ export default function ReviewPage() {
     return true;
   }, []);
 
+  const loadOversight = useCallback(async (userId: string) => {
+    const client = supabase;
+    if (!client) return;
+    const [administrator, teachingDirector] = await Promise.all([
+      client
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      client
+        .from("reviewer_roles")
+        .select("user_id")
+        .eq("user_id", userId)
+        .eq("role", "teaching_director")
+        .maybeSingle(),
+    ]);
+    setHasOversight(Boolean(administrator.data || teachingDirector.data));
+  }, []);
+
   useEffect(() => {
     const client = supabase;
     if (!client) return;
@@ -514,13 +549,14 @@ export default function ReviewPage() {
       setNotice(null);
       if (!nextUser) {
         setRows([]);
+        setHasOversight(false);
         setAuthState("signed-out");
         setQueueLoading(false);
         setQueueLoaded(false);
         return;
       }
       setAuthState("authenticated");
-      await loadQueue();
+      await Promise.all([loadQueue(), loadOversight(nextUser.id)]);
     };
 
     void client.auth
@@ -536,7 +572,31 @@ export default function ReviewPage() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [loadQueue]);
+  }, [loadOversight, loadQueue]);
+
+  // Stage sign-off detail — reviewer names, dates and any administrator
+  // override — for the approval block printed on an approved document.
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !assessmentId || authState !== "authenticated") {
+      setReviewStatuses([]);
+      return;
+    }
+    let active = true;
+    void client
+      .rpc("assessment_review_status", { target_assessment_id: assessmentId })
+      .then(({ data }) => {
+        if (active) setReviewStatuses(data ?? []);
+      });
+    return () => {
+      active = false;
+    };
+  }, [assessmentId, authState]);
+
+  useEffect(() => {
+    if (!isDocumentOpen) return;
+    setPrintPageCount(measurePrintPageCount(documentPageRef.current));
+  }, [isDocumentOpen]);
 
   const assessmentRows = useMemo(
     () =>
@@ -550,6 +610,13 @@ export default function ReviewPage() {
             )
         : [],
     [assessmentId, rows],
+  );
+
+  // Merging a saved brief over the template defaults is not free, and this page
+  // re-renders on every keystroke in the decision comment box.
+  const briefDocument = useMemo(
+    () => briefDocumentDataFromContent(assessmentRows[0]?.content ?? {}),
+    [assessmentRows],
   );
 
   useEffect(() => {
@@ -767,528 +834,649 @@ export default function ReviewPage() {
     (entry) => entry.rows.length > 0,
   );
 
+  // Mirrors public.assessment_can_export_final, which is owner-only and so
+  // cannot be called from here: approved overall, with both stages signed off
+  // at the version currently on the table.
+  const documentIsApproved =
+    assessment.status === "approved" &&
+    STAGES.every((stage) =>
+      assessmentRows.some(
+        (row) =>
+          row.stage === stage &&
+          row.state === "approved" &&
+          row.reviewer_id &&
+          row.reviewed_version === row.assessment_version,
+      ),
+    );
+  const downloadDocument = () => {
+    setPrintPageCount(measurePrintPageCount(documentPageRef.current));
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => window.print()),
+    );
+  };
+
   return (
-    <main className="min-h-screen bg-[#f4f5f8] text-slate-950">
-      <AppHeader
-        eyebrow="Assessment brief management"
-        title="Read-only assessment review"
-        subtitle={`${assessment.module_code} · ${assessment.owner_name || "Unknown owner"}`}
-        maxWidthClass="max-w-400"
-        actionsLabel="Assessment review actions"
-        actions={
-          <>
-            <a href="./reviews" className="button-primary">
-              Review dashboard
-            </a>
-            <a href="./" className="button-secondary">
-              My dashboard
-            </a>
-            <a href="./builder" className="button-secondary">
-              Builder
-            </a>
-            <button
-              type="button"
-              onClick={signOut}
-              className="button-secondary"
-            >
-              Sign out
-            </button>
-          </>
-        }
-      />
-
-      <div className="mx-auto max-w-400 px-4 py-5 sm:px-7 lg:py-8">
-        <div className="mb-5 overflow-hidden rounded-3xl bg-slate-950 px-5 py-6 text-white shadow-xl shadow-slate-900/10 sm:px-7">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-white/10 px-2.5 py-1 text-xs font-black tracking-wide text-white">
-                  {assessment.module_code}
-                </span>
-                <StatusBadge state={assessment.status} workflow />
-                <span className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                  Version {assessment.assessment_version}
-                </span>
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                {text(formData.module) || assessment.title}
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                Read-only brief submitted by{" "}
-                <span className="font-semibold text-white">
-                  {assessment.owner_name || "Unknown owner"}
-                </span>
-              </p>
-            </div>
-            <p className="shrink-0 text-xs font-medium text-slate-400">
-              No PDF preview · Reviewing saved content
-            </p>
-          </div>
-        </div>
-
-        {(error || notice) && (
-          <div className="mb-5 space-y-3">
-            {error && (
-              <div
-                role="alert"
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+    <>
+      <main
+        className={`min-h-screen bg-[#f4f5f8] text-slate-950 ${
+          isDocumentOpen ? "print:hidden" : ""
+        }`}
+      >
+        <AppHeader
+          eyebrow="Assessment brief management"
+          title="Read-only assessment review"
+          subtitle={`${assessment.module_code} · ${assessment.owner_name || "Unknown owner"}`}
+          maxWidthClass="max-w-400"
+          actionsLabel="Assessment review actions"
+          actions={
+            <>
+              <a href="./reviews" className="button-primary">
+                Review dashboard
+              </a>
+              <a href="./" className="button-secondary">
+                My dashboard
+              </a>
+              <a href="./builder" className="button-secondary">
+                Builder
+              </a>
+              <button
+                type="button"
+                onClick={signOut}
+                className="button-secondary"
               >
-                <span>{error}</span>
+                Sign out
+              </button>
+            </>
+          }
+        />
+
+        <div className="mx-auto max-w-400 px-4 py-5 sm:px-7 lg:py-8">
+          <div className="mb-5 overflow-hidden rounded-3xl bg-slate-950 px-5 py-6 text-white shadow-xl shadow-slate-900/10 sm:px-7">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-white/10 px-2.5 py-1 text-xs font-black tracking-wide text-white">
+                    {assessment.module_code}
+                  </span>
+                  <StatusBadge state={assessment.status} workflow />
+                  <span className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                    Version {assessment.assessment_version}
+                  </span>
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {text(formData.module) || assessment.title}
+                </h2>
+                <p className="mt-2 text-sm text-slate-300">
+                  Read-only brief submitted by{" "}
+                  <span className="font-semibold text-white">
+                    {assessment.owner_name || "Unknown owner"}
+                  </span>
+                </p>
+              </div>
+              {hasOversight ? (
                 <button
                   type="button"
-                  onClick={() => void loadQueue()}
-                  className="font-bold underline underline-offset-4"
+                  onClick={() => setIsDocumentOpen(true)}
+                  className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-900 hover:bg-slate-200"
                 >
-                  Reload
+                  View / download PDF
                 </button>
-              </div>
-            )}
-            {notice && (
-              <div
-                role="status"
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
-              >
-                {notice}
-              </div>
-            )}
+              ) : (
+                <p className="shrink-0 text-xs font-medium text-slate-400">
+                  No PDF preview · Reviewing saved content
+                </p>
+              )}
+            </div>
           </div>
-        )}
 
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.85fr)_minmax(20rem,1fr)] xl:gap-7">
-          <div className="min-w-0 space-y-5">
-            <SectionCard number={1} title="Header Details">
-              <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <ReadOnlyValue label="School" value={text(formData.school)} />
-                <ReadOnlyValue
-                  label="Assessment Name"
-                  value={
-                    text(formData.assessmentName) ||
-                    assessment.title ||
-                    text(formData.module)
-                  }
-                />
-                <ReadOnlyValue
-                  label="Academic year"
-                  value={text(formData.academicYear)}
-                />
-                <ReadOnlyValue
-                  label="Module / title"
-                  value={text(formData.module) || assessment.title}
-                  className="sm:col-span-2"
-                />
-                <ReadOnlyValue
-                  label="Weighting"
-                  value={text(formData.weighting)}
-                />
-                <ReadOnlyValue label="Set By" value={text(formData.setBy)} />
-                <ReadOnlyValue
-                  label="Checked By"
-                  value={text(formData.checkedBy)}
-                />
-                <ReadOnlyValue
-                  label="Release Date"
-                  value={formatDate(text(formData.releaseDate))}
-                />
-                <ReadOnlyValue
-                  label="Submission Date"
-                  value={formatDate(submissionDate, true)}
-                />
-                <ReadOnlyValue
-                  label="Submission Location"
-                  value={text(formData.submissionLocation)}
-                />
-                <ReadOnlyValue
-                  label="Feedback Return Date"
-                  value={formatDate(
-                    text(formData.returnDate) ||
-                      text(formData.returnOfFeedback),
+          {(error || notice) && (
+            <div className="mb-5 space-y-3">
+              {error && (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+                >
+                  <span>{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadQueue()}
+                    className="font-bold underline underline-offset-4"
+                  >
+                    Reload
+                  </button>
+                </div>
+              )}
+              {notice && (
+                <div
+                  role="status"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+                >
+                  {notice}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.85fr)_minmax(20rem,1fr)] xl:gap-7">
+            <div className="min-w-0 space-y-5">
+              <SectionCard number={1} title="Header Details">
+                <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <ReadOnlyValue label="School" value={text(formData.school)} />
+                  <ReadOnlyValue
+                    label="Assessment Name"
+                    value={
+                      text(formData.assessmentName) ||
+                      assessment.title ||
+                      text(formData.module)
+                    }
+                  />
+                  <ReadOnlyValue
+                    label="Academic year"
+                    value={text(formData.academicYear)}
+                  />
+                  <ReadOnlyValue
+                    label="Module / title"
+                    value={text(formData.module) || assessment.title}
+                    className="sm:col-span-2"
+                  />
+                  <ReadOnlyValue
+                    label="Weighting"
+                    value={text(formData.weighting)}
+                  />
+                  <ReadOnlyValue label="Set By" value={text(formData.setBy)} />
+                  <ReadOnlyValue
+                    label="Checked By"
+                    value={text(formData.checkedBy)}
+                  />
+                  <ReadOnlyValue
+                    label="Release Date"
+                    value={formatDate(text(formData.releaseDate))}
+                  />
+                  <ReadOnlyValue
+                    label="Submission Date"
+                    value={formatDate(submissionDate, true)}
+                  />
+                  <ReadOnlyValue
+                    label="Submission Location"
+                    value={text(formData.submissionLocation)}
+                  />
+                  <ReadOnlyValue
+                    label="Feedback Return Date"
+                    value={formatDate(
+                      text(formData.returnDate) ||
+                        text(formData.returnOfFeedback),
+                    )}
+                  />
+                </dl>
+
+                {coTaughtModules.length > 0 && (
+                  <div className="mt-5 border-t border-slate-100 pt-5">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                      Co-taught module weightings
+                    </h3>
+                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {coTaughtModules.map((entry, index) => (
+                        <div
+                          key={`${text(entry.module)}-${index}`}
+                          className="flex justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm"
+                        >
+                          <dt className="font-semibold text-slate-800">
+                            {text(entry.module) || `Module ${index + 1}`}
+                          </dt>
+                          <dd className="text-slate-600">
+                            {text(entry.weighting) || "Not provided"}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
+              </SectionCard>
+
+              <SectionCard number={2} title="Assessment Setup">
+                <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <ReadOnlyValue
+                    label="Assessment type"
+                    value={text(formData.assessmentType)}
+                  />
+                  <ReadOnlyValue label="Grading scheme" value={gradingScheme} />
+                  <ReadOnlyValue
+                    label="Group work permitted"
+                    value={booleanLabel(formData.groupWorkPermitted)}
+                  />
+                  {text(formData.assessmentType) === "Other" && (
+                    <ReadOnlyValue
+                      label="Custom assessment"
+                      value={text(formData.customAssessmentName)}
+                    />
                   )}
-                />
-              </dl>
+                  {text(formData.groupWorkPermitted).toLowerCase() === "yes" && (
+                    <ReadOnlyValue
+                      label="Group size"
+                      value={text(formData.groupSize)}
+                    />
+                  )}
+                </dl>
+                {text(formData.customAssessmentDesc) && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <Markdown content={text(formData.customAssessmentDesc)} />
+                  </div>
+                )}
+                {text(formData.groupMechanics) && (
+                  <div className="mt-4">
+                    <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                      Group mechanics
+                    </h3>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <Markdown content={text(formData.groupMechanics)} />
+                    </div>
+                  </div>
+                )}
+              </SectionCard>
 
-              {coTaughtModules.length > 0 && (
-                <div className="mt-5 border-t border-slate-100 pt-5">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                    Co-taught module weightings
-                  </h3>
-                  <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {coTaughtModules.map((entry, index) => (
-                      <div
-                        key={`${text(entry.module)}-${index}`}
-                        className="flex justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm"
+              <SectionCard number={3} title="Generative AI Policy">
+                <div
+                  className={`rounded-2xl border p-4 ${text(formData.aiPolicy) === "RED" ? "border-rose-200 bg-rose-50" : text(formData.aiPolicy) === "AMBER" ? "border-amber-200 bg-amber-50" : text(formData.aiPolicy) === "GREEN" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Traffic-light classification
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {text(formData.aiPolicy) || "Not provided"}
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {text(formData.aiAmberPermitted) && (
+                    <ContentSection
+                      label="Permitted uses"
+                      content={text(formData.aiAmberPermitted)}
+                    />
+                  )}
+                  {text(formData.aiAmberProhibited) && (
+                    <ContentSection
+                      label="Prohibited uses"
+                      content={text(formData.aiAmberProhibited)}
+                    />
+                  )}
+                  {text(formData.aiGreenPermitted) && (
+                    <ContentSection
+                      label="Permitted uses"
+                      content={text(formData.aiGreenPermitted)}
+                    />
+                  )}
+                </div>
+              </SectionCard>
+
+              <SectionCard number={4} title="Employability Skills">
+                {selectedSkills.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSkills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800"
                       >
-                        <dt className="font-semibold text-slate-800">
-                          {text(entry.module) || `Module ${index + 1}`}
-                        </dt>
-                        <dd className="text-slate-600">
-                          {text(entry.weighting) || "Not provided"}
-                        </dd>
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-slate-400">
+                    No employability skills selected.
+                  </p>
+                )}
+              </SectionCard>
+
+              <SectionCard number={5} title="Content Specifications">
+                <div className="space-y-4">
+                  {CONTENT_SECTIONS.map(([key, label]) => (
+                    <ContentSection
+                      key={key}
+                      label={label}
+                      content={text(formData[key])}
+                    />
+                  ))}
+                  {coTaughtMarkingSchemes.map((entry) => (
+                    <ContentSection
+                      key={`marking-${entry.label}`}
+                      label={`Marking scheme — ${entry.label}`}
+                      content={entry.markingScheme}
+                    />
+                  ))}
+                </div>
+              </SectionCard>
+
+              <SectionCard number={6} title="Grading Matrix">
+                {rubricRows.length > 0 || coTaughtGradingMatrices.length > 0 ? (
+                  <div className="space-y-6">
+                    {rubricRows.length > 0 && (
+                      <div>
+                        {coTaughtGradingMatrices.length > 0 && (
+                          <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                            Shared matrix
+                          </h3>
+                        )}
+                        <RubricTable rows={rubricRows} bands={gradeBands} />
+                      </div>
+                    )}
+                    {coTaughtGradingMatrices.map((entry) => (
+                      <div key={`matrix-${entry.label}`}>
+                        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                          {entry.label}
+                          {entry.weighting ? ` · ${entry.weighting}` : ""} ·{" "}
+                          {entry.scheme}
+                        </h3>
+                        <RubricTable
+                          rows={entry.rows}
+                          bands={bandsFor(entry.scheme)}
+                        />
                       </div>
                     ))}
-                  </dl>
-                </div>
-              )}
-            </SectionCard>
-
-            <SectionCard number={2} title="Assessment Setup">
-              <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <ReadOnlyValue
-                  label="Assessment type"
-                  value={text(formData.assessmentType)}
-                />
-                <ReadOnlyValue label="Grading scheme" value={gradingScheme} />
-                <ReadOnlyValue
-                  label="Group work permitted"
-                  value={booleanLabel(formData.groupWorkPermitted)}
-                />
-                {text(formData.assessmentType) === "Other" && (
-                  <ReadOnlyValue
-                    label="Custom assessment"
-                    value={text(formData.customAssessmentName)}
-                  />
-                )}
-                {text(formData.groupWorkPermitted).toLowerCase() === "yes" && (
-                  <ReadOnlyValue
-                    label="Group size"
-                    value={text(formData.groupSize)}
-                  />
-                )}
-              </dl>
-              {text(formData.customAssessmentDesc) && (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <Markdown content={text(formData.customAssessmentDesc)} />
-                </div>
-              )}
-              {text(formData.groupMechanics) && (
-                <div className="mt-4">
-                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                    Group mechanics
-                  </h3>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <Markdown content={text(formData.groupMechanics)} />
                   </div>
-                </div>
-              )}
-            </SectionCard>
-
-            <SectionCard number={3} title="Generative AI Policy">
-              <div
-                className={`rounded-2xl border p-4 ${text(formData.aiPolicy) === "RED" ? "border-rose-200 bg-rose-50" : text(formData.aiPolicy) === "AMBER" ? "border-amber-200 bg-amber-50" : text(formData.aiPolicy) === "GREEN" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}
-              >
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Traffic-light classification
-                </p>
-                <p className="mt-1 text-lg font-bold text-slate-900">
-                  {text(formData.aiPolicy) || "Not provided"}
-                </p>
-              </div>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {text(formData.aiAmberPermitted) && (
-                  <ContentSection
-                    label="Permitted uses"
-                    content={text(formData.aiAmberPermitted)}
-                  />
-                )}
-                {text(formData.aiAmberProhibited) && (
-                  <ContentSection
-                    label="Prohibited uses"
-                    content={text(formData.aiAmberProhibited)}
-                  />
-                )}
-                {text(formData.aiGreenPermitted) && (
-                  <ContentSection
-                    label="Permitted uses"
-                    content={text(formData.aiGreenPermitted)}
-                  />
-                )}
-              </div>
-            </SectionCard>
-
-            <SectionCard number={4} title="Employability Skills">
-              {selectedSkills.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedSkills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm italic text-slate-400">
-                  No employability skills selected.
-                </p>
-              )}
-            </SectionCard>
-
-            <SectionCard number={5} title="Content Specifications">
-              <div className="space-y-4">
-                {CONTENT_SECTIONS.map(([key, label]) => (
-                  <ContentSection
-                    key={key}
-                    label={label}
-                    content={text(formData[key])}
-                  />
-                ))}
-                {coTaughtMarkingSchemes.map((entry) => (
-                  <ContentSection
-                    key={`marking-${entry.label}`}
-                    label={`Marking scheme — ${entry.label}`}
-                    content={entry.markingScheme}
-                  />
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard number={6} title="Grading Matrix">
-              {rubricRows.length > 0 || coTaughtGradingMatrices.length > 0 ? (
-                <div className="space-y-6">
-                  {rubricRows.length > 0 && (
-                    <div>
-                      {coTaughtGradingMatrices.length > 0 && (
-                        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                          Shared matrix
-                        </h3>
-                      )}
-                      <RubricTable rows={rubricRows} bands={gradeBands} />
-                    </div>
-                  )}
-                  {coTaughtGradingMatrices.map((entry) => (
-                    <div key={`matrix-${entry.label}`}>
-                      <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                        {entry.label}
-                        {entry.weighting ? ` · ${entry.weighting}` : ""} ·{" "}
-                        {entry.scheme}
-                      </h3>
-                      <RubricTable
-                        rows={entry.rows}
-                        bands={bandsFor(entry.scheme)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm italic text-slate-400">
-                  No grading matrix included in this version.
-                </p>
-              )}
-            </SectionCard>
-          </div>
-
-          <aside className="min-w-0 space-y-4 lg:sticky lg:top-24">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                    Review details
+                ) : (
+                  <p className="text-sm italic text-slate-400">
+                    No grading matrix included in this version.
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold">
-                    Assessment workflow
-                  </h2>
-                </div>
-                <StatusBadge state={assessment.status} workflow />
-              </div>
-              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
-                <div>
-                  <dt className="text-slate-500">Version</dt>
-                  <dd className="mt-1 font-semibold text-slate-800">
-                    {assessment.assessment_version}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Owner</dt>
-                  <dd className="mt-1 font-semibold text-slate-800">
-                    {assessment.owner_name || "Unknown"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Submitted</dt>
-                  <dd className="mt-1 font-semibold text-slate-800">
-                    {formatDate(assessment.submitted_at, true)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Updated</dt>
-                  <dd className="mt-1 font-semibold text-slate-800">
-                    {formatDate(assessment.updated_at, true)}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+                )}
+              </SectionCard>
+            </div>
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <header className="border-b border-slate-200 px-5 py-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                  Approval stages
-                </p>
-                <h2 className="mt-1 text-base font-semibold">
-                  Three-part review
-                </h2>
-              </header>
-              <div className="divide-y divide-slate-100">
-                {STAGES.map((stage) => {
-                  const row = assessmentRows.find(
-                    (item) => item.stage === stage,
-                  );
-                  return (
-                    <button
-                      key={stage}
-                      type="button"
-                      onClick={() => chooseStage(stage)}
-                      aria-pressed={selectedStage === stage}
-                      className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50 ${selectedStage === stage ? "bg-indigo-50/70 ring-1 ring-inset ring-indigo-200" : ""}`}
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-xs font-semibold text-slate-800">
-                          {STAGE_LABELS[stage]}
-                        </span>
-                        <span className="mt-0.5 block text-[10px] text-slate-500">
-                          {row
-                            ? row.awaiting_previous_stage
-                              ? "Waiting on the checker"
-                              : row.can_review
-                                ? "Available to you now"
-                                : "Oversight view"
-                            : "Not available in your queue"}
-                        </span>
-                      </span>
-                      <StatusBadge state={row?.state ?? "unavailable"} />
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+            <aside className="min-w-0 space-y-4 lg:sticky lg:top-24">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                      Review details
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      Assessment workflow
+                    </h2>
+                  </div>
+                  <StatusBadge state={assessment.status} workflow />
+                </div>
+                <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
+                  <div>
+                    <dt className="text-slate-500">Version</dt>
+                    <dd className="mt-1 font-semibold text-slate-800">
+                      {assessment.assessment_version}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Owner</dt>
+                    <dd className="mt-1 font-semibold text-slate-800">
+                      {assessment.owner_name || "Unknown"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Submitted</dt>
+                    <dd className="mt-1 font-semibold text-slate-800">
+                      {formatDate(assessment.submitted_at, true)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Updated</dt>
+                    <dd className="mt-1 font-semibold text-slate-800">
+                      {formatDate(assessment.updated_at, true)}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <header className="border-b border-slate-200 px-5 py-4">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                    Selected stage
+                    Approval stages
                   </p>
                   <h2 className="mt-1 text-base font-semibold">
-                    {STAGE_DESCRIPTIONS[selectedStage]}
+                    Three-part review
                   </h2>
-                </div>
-                <StatusBadge state={selectedRow?.state ?? "unavailable"} />
-              </div>
-
-              {selectedRow ? (
-                <>
-                  <dl className="mt-5 space-y-3 text-xs">
-                    <div>
-                      <dt className="text-slate-500">Latest decision by</dt>
-                      <dd className="mt-1 wrap-break-word font-semibold text-slate-800">
-                        {reviewerLabel(selectedRow, user)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate-500">State</dt>
-                      <dd className="mt-1 font-semibold text-slate-800">
-                        {sentenceCase(selectedRow.state)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate-500">Reviewed version</dt>
-                      <dd className="mt-1 font-semibold text-slate-800">
-                        {selectedRow.reviewed_version == null
-                          ? "Not yet reviewed"
-                          : `Version ${selectedRow.reviewed_version}`}
-                      </dd>
-                    </div>
-                  </dl>
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                      Latest comment
-                    </p>
-                    <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                      {selectedRow.comment || (
-                        <span className="italic text-slate-400">
-                          No comment recorded.
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  {canAct ? (
-                    <div className="mt-5 border-t border-slate-200 pt-5">
-                      <label
-                        htmlFor="review-comment"
-                        className="text-xs font-semibold text-slate-700"
+                </header>
+                <div className="divide-y divide-slate-100">
+                  {STAGES.map((stage) => {
+                    const row = assessmentRows.find(
+                      (item) => item.stage === stage,
+                    );
+                    return (
+                      <button
+                        key={stage}
+                        type="button"
+                        onClick={() => chooseStage(stage)}
+                        aria-pressed={selectedStage === stage}
+                        className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50 ${selectedStage === stage ? "bg-indigo-50/70 ring-1 ring-inset ring-indigo-200" : ""}`}
                       >
-                        Review comment{" "}
-                        <span className="font-normal text-slate-500">
-                          (optional for approval; required to withdraw)
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-slate-800">
+                            {STAGE_LABELS[stage]}
+                          </span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">
+                            {row
+                              ? row.awaiting_previous_stage
+                                ? "Waiting on the checker"
+                                : row.can_review
+                                  ? "Available to you now"
+                                  : "Oversight view"
+                              : "Not available in your queue"}
+                          </span>
                         </span>
-                      </label>
-                      <textarea
-                        id="review-comment"
-                        rows={4}
-                        value={comment}
-                        disabled={saving}
-                        onChange={(event) => {
-                          setComment(event.target.value);
-                          if (event.target.value.trim().length >= 2)
-                            setValidationError(null);
-                        }}
-                        placeholder="Add concise, actionable feedback…"
-                        className="mt-2 block w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      />
-                      {validationError && (
-                        <p
-                          role="alert"
-                          className="mt-2 text-xs font-semibold text-rose-700"
-                        >
-                          {validationError}
-                        </p>
-                      )}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void recordDecision("approve")}
-                          className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {saving ? "Saving…" : "Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void recordDecision("withdraw")}
-                          className="inline-flex min-h-10 items-center justify-center rounded-full border border-rose-200 bg-white px-4 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {saving
-                            ? "Saving…"
-                            : isApproved
-                              ? "Withdraw approval"
-                              : "Request changes"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-4 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
-                      {selectedRow.awaiting_previous_stage
-                        ? `Waiting on ${selectedRow.checker_name || "the checker"} to approve version ${selectedRow.assessment_version}. Cluster lead sign-off opens once they have.`
-                        : selectedRow.reviewer_id !== user.id
-                          ? selectedRow.reviewer_id
-                            ? "Read-only oversight: this stage is assigned to another reviewer."
-                            : "Read-only oversight: no reviewer is assigned to this stage."
-                          : "Actions are unavailable at this workflow stage."}
+                        <StatusBadge state={row?.state ?? "unavailable"} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                      Selected stage
                     </p>
-                  )}
-                </>
-              ) : (
-                <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-600">
-                  This stage is not exposed in your queue. Assigned reviewers
-                  can view and act only on their own stage; administrators
-                  and Teaching Directors can see oversight rows.
-                </p>
-              )}
-            </section>
-          </aside>
+                    <h2 className="mt-1 text-base font-semibold">
+                      {STAGE_DESCRIPTIONS[selectedStage]}
+                    </h2>
+                  </div>
+                  <StatusBadge state={selectedRow?.state ?? "unavailable"} />
+                </div>
+
+                {selectedRow ? (
+                  <>
+                    <dl className="mt-5 space-y-3 text-xs">
+                      <div>
+                        <dt className="text-slate-500">Latest decision by</dt>
+                        <dd className="mt-1 wrap-break-word font-semibold text-slate-800">
+                          {reviewerLabel(selectedRow, user)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">State</dt>
+                        <dd className="mt-1 font-semibold text-slate-800">
+                          {sentenceCase(selectedRow.state)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Reviewed version</dt>
+                        <dd className="mt-1 font-semibold text-slate-800">
+                          {selectedRow.reviewed_version == null
+                            ? "Not yet reviewed"
+                            : `Version ${selectedRow.reviewed_version}`}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                        Latest comment
+                      </p>
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                        {selectedRow.comment || (
+                          <span className="italic text-slate-400">
+                            No comment recorded.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {canAct ? (
+                      <div className="mt-5 border-t border-slate-200 pt-5">
+                        <label
+                          htmlFor="review-comment"
+                          className="text-xs font-semibold text-slate-700"
+                        >
+                          Review comment{" "}
+                          <span className="font-normal text-slate-500">
+                            (optional for approval; required to withdraw)
+                          </span>
+                        </label>
+                        <textarea
+                          id="review-comment"
+                          rows={4}
+                          value={comment}
+                          disabled={saving}
+                          onChange={(event) => {
+                            setComment(event.target.value);
+                            if (event.target.value.trim().length >= 2)
+                              setValidationError(null);
+                          }}
+                          placeholder="Add concise, actionable feedback…"
+                          className="mt-2 block w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        {validationError && (
+                          <p
+                            role="alert"
+                            className="mt-2 text-xs font-semibold text-rose-700"
+                          >
+                            {validationError}
+                          </p>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void recordDecision("approve")}
+                            className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {saving ? "Saving…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void recordDecision("withdraw")}
+                            className="inline-flex min-h-10 items-center justify-center rounded-full border border-rose-200 bg-white px-4 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {saving
+                              ? "Saving…"
+                              : isApproved
+                                ? "Withdraw approval"
+                                : "Request changes"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-4 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
+                        {selectedRow.awaiting_previous_stage
+                          ? `Waiting on ${selectedRow.checker_name || "the checker"} to approve version ${selectedRow.assessment_version}. Cluster lead sign-off opens once they have.`
+                          : selectedRow.reviewer_id !== user.id
+                            ? selectedRow.reviewer_id
+                              ? "Read-only oversight: this stage is assigned to another reviewer."
+                              : "Read-only oversight: no reviewer is assigned to this stage."
+                            : "Actions are unavailable at this workflow stage."}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-600">
+                    This stage is not exposed in your queue. Assigned reviewers
+                    can view and act only on their own stage; administrators
+                    and Teaching Directors can see oversight rows.
+                  </p>
+                )}
+              </section>
+            </aside>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+
+      {/* Oversight document view. Printing targets this overlay alone, which is
+          why <main> above goes print:hidden while it is open. */}
+      {isDocumentOpen && hasOversight && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-800 print:static print:block print:h-auto print:overflow-visible print:bg-white">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-900/60 bg-slate-900 px-5 py-3 print:hidden">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-400">
+                {documentIsApproved
+                  ? "Approved document"
+                  : "Draft · approvals outstanding"}
+              </p>
+              <p className="truncate text-sm font-semibold text-white">
+                {assessment.module_code} · {assessment.title} · v
+                {assessment.assessment_version}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDocumentZoom((zoom) => Math.max(40, zoom - 10))
+                  }
+                  aria-label="Zoom out"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-base font-bold leading-none text-slate-300 hover:bg-white/15 hover:text-white"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center font-mono text-xs tabular-nums text-slate-300">
+                  {documentZoom}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDocumentZoom((zoom) => Math.min(160, zoom + 10))
+                  }
+                  aria-label="Zoom in"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-base font-bold leading-none text-slate-300 hover:bg-white/15 hover:text-white"
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={downloadDocument}
+                className="inline-flex min-h-9 items-center rounded-full bg-white px-4 text-xs font-bold text-slate-900 hover:bg-slate-200"
+              >
+                Download PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDocumentOpen(false)}
+                className="inline-flex min-h-9 items-center rounded-full border border-white/20 px-4 text-xs font-bold text-slate-200 hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-1 justify-center overflow-auto bg-slate-700 p-10 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
+            <div
+              className="pdf-preview-stage mx-auto shrink-0"
+              style={{
+                width: `${(210 * documentZoom) / 100}mm`,
+                minHeight: `${(297 * documentZoom) / 100}mm`,
+              }}
+            >
+              <BriefDocument
+                pageRef={documentPageRef}
+                zoom={documentZoom}
+                formData={briefDocument.formData}
+                sectionToggles={briefDocument.sectionToggles}
+                selectedSkills={briefDocument.selectedSkills}
+                rubricRows={briefDocument.rubricRows}
+                uploadedImages={briefDocument.uploadedImages}
+                reviewStatuses={reviewStatuses}
+                isApproved={documentIsApproved}
+                printPageCount={printPageCount}
+                version={assessment.assessment_version}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { Assessment, Database, Json } from "@/lib/database.types";
@@ -16,6 +16,8 @@ type WorkflowUser =
   Database["public"]["Functions"]["admin_review_workflow_users"]["Returns"][number];
 type ReviewEvent =
   Database["public"]["Tables"]["assessment_review_events"]["Row"];
+type ReviewAssignment =
+  Database["public"]["Functions"]["admin_review_assignments"]["Returns"][number];
 type WorkflowRole = "cluster_lead" | "teaching_director";
 type WorkflowCapability = WorkflowRole;
 type Deadline = {
@@ -45,6 +47,8 @@ type SavedBriefContent = {
 
 const ALL = "all";
 const LONG_TEXT_THRESHOLD = 100;
+// Both stages must be approved at the current version before a final export.
+const REVIEW_STAGES = ["checker", "cluster_lead"] as const;
 const REVIEWER_ROLES: {
   value: WorkflowRole;
   label: string;
@@ -325,6 +329,9 @@ export default function AdminDashboard() {
   );
   const [workflowUsers, setWorkflowUsers] = useState<WorkflowUser[]>([]);
   const [reviewEvents, setReviewEvents] = useState<ReviewEvent[]>([]);
+  const [reviewAssignments, setReviewAssignments] = useState<
+    ReviewAssignment[]
+  >([]);
   const [currentProfileName, setCurrentProfileName] = useState("");
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -332,6 +339,11 @@ export default function AdminDashboard() {
     null,
   );
   const [changingWorkflowRole, setChangingWorkflowRole] = useState<
+    string | null
+  >(null);
+  const [overrideTargetId, setOverrideTargetId] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [overridingAssessmentId, setOverridingAssessmentId] = useState<
     string | null
   >(null);
 
@@ -362,6 +374,7 @@ export default function AdminDashboard() {
         setDirectoryUsers([]);
         setWorkflowUsers([]);
         setReviewEvents([]);
+        setReviewAssignments([]);
         setCurrentProfileName("");
         setProfileNames({});
         setAccessState("signed-out");
@@ -420,6 +433,7 @@ export default function AdminDashboard() {
         directoryResult,
         workflowUsersResult,
         reviewEventsResult,
+        reviewAssignmentsResult,
       ] = await Promise.all([
         client
           .from("assessments")
@@ -432,6 +446,7 @@ export default function AdminDashboard() {
           .select("*")
           .order("created_at", { ascending: false })
           .limit(200),
+        client.rpc("admin_review_assignments"),
       ]);
       const loadErrors: string[] = [];
 
@@ -470,6 +485,13 @@ export default function AdminDashboard() {
         setReviewEvents(reviewEventsResult.data ?? []);
       }
 
+      if (reviewAssignmentsResult.error) {
+        loadErrors.push(reviewAssignmentsResult.error.message);
+        setReviewAssignments([]);
+      } else {
+        setReviewAssignments(reviewAssignmentsResult.data ?? []);
+      }
+
       setError(loadErrors.length > 0 ? loadErrors.join(" ") : null);
       setAccessState("admin");
     };
@@ -486,6 +508,16 @@ export default function AdminDashboard() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const assignmentsByAssessment = useMemo(() => {
+    const grouped = new Map<string, ReviewAssignment[]>();
+    for (const assignment of reviewAssignments) {
+      const stages = grouped.get(assignment.assessment_id);
+      if (stages) stages.push(assignment);
+      else grouped.set(assignment.assessment_id, [assignment]);
+    }
+    return grouped;
+  }, [reviewAssignments]);
 
   const allDeadlinesByAssessment = useMemo(
     () =>
@@ -721,6 +753,66 @@ export default function AdminDashboard() {
           : item,
       ),
     );
+  };
+
+  // The override moves the assessment to approved, rewrites both stage rows and
+  // appends audit events, so all three feeds are re-read together.
+  const refreshWorkflowData = async () => {
+    const client = supabase;
+    if (!client) return;
+
+    const [assessmentResult, reviewAssignmentsResult, reviewEventsResult] =
+      await Promise.all([
+        client
+          .from("assessments")
+          .select("*")
+          .order("updated_at", { ascending: false }),
+        client.rpc("admin_review_assignments"),
+        client
+          .from("assessment_review_events")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200),
+      ]);
+
+    if (!assessmentResult.error) setAssessments(assessmentResult.data ?? []);
+    if (!reviewAssignmentsResult.error)
+      setReviewAssignments(reviewAssignmentsResult.data ?? []);
+    if (!reviewEventsResult.error)
+      setReviewEvents(reviewEventsResult.data ?? []);
+
+    const refreshError =
+      assessmentResult.error?.message ||
+      reviewAssignmentsResult.error?.message ||
+      reviewEventsResult.error?.message;
+    if (refreshError) setError(refreshError);
+  };
+
+  const overrideApprovals = async (assessment: Assessment) => {
+    if (!supabase) return;
+    const reason = overrideReason.trim();
+    if (reason.length < 2) {
+      setError("Give a reason of at least 2 characters for the override.");
+      return;
+    }
+
+    setOverridingAssessmentId(assessment.id);
+    setError(null);
+
+    const result = await supabase.rpc("admin_override_assessment_approval", {
+      override_reason: reason,
+      target_assessment_id: assessment.id,
+    });
+    setOverridingAssessmentId(null);
+
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+
+    setOverrideTargetId(null);
+    setOverrideReason("");
+    await refreshWorkflowData();
   };
 
   const signIn = async () => {
@@ -1094,6 +1186,7 @@ export default function AdminDashboard() {
                   <th className="px-5 py-3 font-semibold">Status</th>
                   <th className="px-5 py-3 font-semibold">Next deadline</th>
                   <th className="px-5 py-3 font-semibold">Updated</th>
+                  <th className="px-5 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -1103,59 +1196,157 @@ export default function AdminDashboard() {
                   )
                     .filter((item) => item.date >= new Date())
                     .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+                  const stages =
+                    assignmentsByAssessment.get(assessment.id) ?? [];
+                  const overriddenStage = stages.find(
+                    (stage) => stage.overridden_by,
+                  );
+                  const fullyApproved =
+                    assessment.status === "approved" &&
+                    REVIEW_STAGES.every((stage) =>
+                      stages.some(
+                        (item) =>
+                          item.stage === stage &&
+                          item.state === "approved" &&
+                          item.reviewer_id &&
+                          item.reviewed_version === assessment.version,
+                      ),
+                    );
+                  const overrideFormOpen = overrideTargetId === assessment.id;
                   return (
-                    <tr
-                      key={assessment.id}
-                      className="transition-colors hover:bg-slate-50/80"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">
-                          {assessment.title}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {assessment.module_code}
-                        </div>
-                      </td>
-                      <td
-                        className="max-w-56 px-5 py-4"
-                        title={assessment.owner_id}
-                      >
-                        <div className="font-medium text-slate-700">
-                          {profileNames[assessment.owner_id] ||
-                            "Profile not completed"}
-                        </div>
-                        <div className="truncate font-mono text-[10px] text-slate-400">
-                          {assessment.owner_id}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-4">
-                        {assessment.academic_year}
-                      </td>
-                      <td className="px-5 py-4">
-                        {assessment.assessment_type}
-                      </td>
-                      <td className="px-5 py-4">
-                        <PolicyBadge value={assessment.ai_policy} />
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize text-slate-700">
-                          {assessment.status}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                        {nextDeadline
-                          ? formatDate(nextDeadline.date, true)
-                          : "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                        {formatDate(assessment.updated_at)}
-                      </td>
-                    </tr>
+                    <Fragment key={assessment.id}>
+                      <tr className="transition-colors hover:bg-slate-50/80">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {assessment.title}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {assessment.module_code}
+                          </div>
+                        </td>
+                        <td
+                          className="max-w-56 px-5 py-4"
+                          title={assessment.owner_id}
+                        >
+                          <div className="font-medium text-slate-700">
+                            {profileNames[assessment.owner_id] ||
+                              "Profile not completed"}
+                          </div>
+                          <div className="truncate font-mono text-[10px] text-slate-400">
+                            {assessment.owner_id}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4">
+                          {assessment.academic_year}
+                        </td>
+                        <td className="px-5 py-4">
+                          {assessment.assessment_type}
+                        </td>
+                        <td className="px-5 py-4">
+                          <PolicyBadge value={assessment.ai_policy} />
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize text-slate-700">
+                            {assessment.status}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                          {nextDeadline
+                            ? formatDate(nextDeadline.date, true)
+                            : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">
+                          {formatDate(assessment.updated_at)}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4">
+                          {overriddenStage ? (
+                            <span
+                              className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
+                              title={`Approvals overridden by ${
+                                overriddenStage.overridden_by_name ||
+                                overriddenStage.overridden_by
+                              }`}
+                            >
+                              Overridden
+                            </span>
+                          ) : fullyApproved ? (
+                            <span className="text-xs text-slate-400">—</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOverrideReason("");
+                                setOverrideTargetId(
+                                  overrideFormOpen ? null : assessment.id,
+                                );
+                              }}
+                              className="button-secondary h-8 min-h-0 px-3"
+                            >
+                              {overrideFormOpen ? "Cancel" : "Override approvals"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {overrideFormOpen && (
+                        <tr className="bg-amber-50/40">
+                          <td colSpan={9} className="px-5 py-4">
+                            <p className="text-sm font-semibold text-slate-900">
+                              Override checker and cluster lead approvals
+                            </p>
+                            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
+                              Both stages will be force-approved at version{" "}
+                              {assessment.version} so the owner can export a final
+                              PDF. Any genuine approval already recorded at this
+                              version is kept. The reason is written to the
+                              permanent audit log and shown on the exported
+                              document. Editing the brief voids the override.
+                            </p>
+                            <textarea
+                              value={overrideReason}
+                              onChange={(event) =>
+                                setOverrideReason(event.target.value)
+                              }
+                              rows={3}
+                              placeholder="Why is this override necessary?"
+                              className="mt-3 w-full max-w-3xl rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void overrideApprovals(assessment)}
+                                disabled={
+                                  overrideReason.trim().length < 2 ||
+                                  overridingAssessmentId === assessment.id
+                                }
+                                className="button-dark h-9 min-h-0 px-3 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {overridingAssessmentId === assessment.id
+                                  ? "Overriding…"
+                                  : "Confirm override"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOverrideTargetId(null);
+                                  setOverrideReason("");
+                                }}
+                                disabled={
+                                  overridingAssessmentId === assessment.id
+                                }
+                                className="button-secondary h-9 min-h-0 px-3 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <EmptyState message="No assessments match these filters." />
                     </td>
                   </tr>
@@ -1173,7 +1364,8 @@ export default function AdminDashboard() {
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
               Immutable workflow events showing historical assignments,
-              submissions, approvals, withdrawals and invalidated versions.
+              submissions, approvals, withdrawals, administrator overrides and
+              invalidated versions.
             </p>
           </div>
           <div className="max-h-96 overflow-y-auto">
@@ -1188,7 +1380,13 @@ export default function AdminDashboard() {
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                          event.action === "overridden"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
                         {event.action.replaceAll("_", " ")}
                       </span>
                       {event.stage && (

@@ -81,6 +81,7 @@ export type Database = {
           comment: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
+          overridden_by: string | null;
           reviewer_id: string | null;
           state: string;
           updated_at: string;
@@ -93,6 +94,7 @@ export type Database = {
           comment?: string | null;
           reviewed_at?: string | null;
           reviewed_version?: number | null;
+          overridden_by?: string | null;
           reviewer_id?: string | null;
           state?: string;
           updated_at?: string;
@@ -105,6 +107,7 @@ export type Database = {
           comment?: string | null;
           reviewed_at?: string | null;
           reviewed_version?: number | null;
+          overridden_by?: string | null;
           reviewer_id?: string | null;
           state?: string;
           updated_at?: string;
@@ -255,6 +258,10 @@ export type Database = {
           user_id: string;
         }[];
       };
+      admin_override_assessment_approval: {
+        Args: { override_reason: string; target_assessment_id: string };
+        Returns: undefined;
+      };
       admin_promote_user: {
         Args: { target_user_id: string };
         Returns: undefined;
@@ -275,6 +282,8 @@ export type Database = {
           assessment_id: string;
           stage: string;
           comment: string | null;
+          overridden_by: string | null;
+          overridden_by_name: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
           reviewer_id: string | null;
@@ -317,6 +326,8 @@ export type Database = {
         Returns: {
           awaiting_previous_stage: boolean;
           comment: string | null;
+          overridden_by: string | null;
+          overridden_by_name: string | null;
           reviewed_at: string | null;
           reviewed_version: number | null;
           reviewer_id: string | null;

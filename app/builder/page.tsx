@@ -1,14 +1,22 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import remarkGfm from "remark-gfm";
-import rehypeKatex from "rehype-katex";
 import SKILLS_LIST from "../skills.json";
 import ASSESSMENT_METHODS from "../assessments.json";
 import TEMPLATE from "../template.json";
 import MODULE_CATALOG from "../module-catalog.json";
 import { AppHeader } from "@/app/components/app-header";
+import {
+  ACADEMIC_YEAR_OPTIONS,
+  BriefDocument,
+  UG_GRADE_BANDS,
+  WORKFLOW_STAGES,
+  briefDocumentDataFromContent,
+  getDefaultState,
+  gradeBandsFor,
+  measurePrintPageCount,
+  type CoTaughtModule,
+  type RubricRow,
+} from "@/app/components/brief-document";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type {
   Assessment,
@@ -21,63 +29,9 @@ import type { User } from "@supabase/supabase-js";
 // ─── Constants & Extracted Text ───────────────────────────────────────────────
 const DRAFT_STORAGE_KEY = "uea_brief_draft_v2";
 
-type RubricRow = Record<string, any> & { id: number };
-
-// A co-taught module can optionally carry its own marking scheme and/or grading
-// matrix when the same brief is assessed differently on each module.
-type CoTaughtModule = {
-  id: number;
-  module: string;
-  weighting: string;
-  markingSchemeEnabled?: boolean;
-  markingScheme?: string;
-  gradingMatrixEnabled?: boolean;
-  gradingScheme?: string;
-  rubricRows?: RubricRow[];
-};
-
 type ReviewStatusRow =
   Database["public"]["Functions"]["assessment_review_status"]["Returns"][number];
 
-type SavedBriefContent = {
-  formData?: Record<string, unknown>;
-  sectionToggles?: Record<string, boolean>;
-  selectedSkills?: string[];
-  rubricRows?: Record<string, unknown>[];
-  uploadedImages?: Record<string, string>;
-};
-
-const DEFAULT_STATIC_CONTENT = {
-  academicIntegrity: {
-    title: "Academic Integrity",
-    warning: "Please read all the information below carefully",
-    body: "The University takes academic integrity very seriously. You must not commit plagiarism, collusion, or contract cheating in your submitted work. Our Policy on Plagiarism, Collusion, and Contract Cheating explains:\n\n* what is meant by the terms 'plagiarism', 'collusion', and 'contract cheating'\n* how to avoid plagiarism, collusion, and contract cheating\n* using a proofreader\n* what will happen if we suspect that you have breached the policy.\n\nIt is essential that you read this policy, and you undertake (or refresh your memory of) our school's training on this. You can find the policy and related guidance here:\n\n[https://my.uea.ac.uk/departments/learningand-teaching/students/academic-cycle/regulations-and-discipline/plagiarism-awareness](https://my.uea.ac.uk/departments/learningand-teaching/students/academic-cycle/regulations-and-discipline/plagiarism-awareness)",
-    groupWorkPrefix: "In this assessment, working with others is",
-    individualWarning:
-      "All aspects of your submission, including but not limited to: research, design, development and writing, must be your own work according to your own understanding of topics. Please pay careful attention to the definitions of contract cheating, plagiarism and collusion in the policy and ask your assessment setter if you are unsure about anything.",
-  },
-  aiPolicy: {
-    title: "AI Policy and Use",
-    preamble:
-      "To ensure fairness and clarity, this module uses a Traffic Light system to outline exactly how you can and cannot use generative AI tools for your assessment.",
-    redTitle: "🔴 RED: No Generative AI Permitted",
-    redBody:
-      "The use of Generative AI tools (e.g., ChatGPT, GitHub Copilot, Claude, Gemini) is **strictly prohibited** for any part of this assessment.\n\n* All code, logic, and writing must be entirely your own creation.\n* Use of AI tools will be treated as academic misconduct.",
-    amberTitle: "🟡 AMBER: Restricted AI Usage Permitted",
-    amberBody:
-      "Generative AI tools may be used for specific, restricted purposes within this assessment.",
-    amberDeclaration:
-      "**Declaration Requirement:** You must explicitly document any allowed AI use. Failure to declare permitted use is considered academic misconduct.",
-    greenTitle: "🟢 GREEN: Full AI Integration Encouraged",
-    greenBody:
-      "Generative AI tools are permitted and/or are a core component of this assessment.",
-    greenDeclaration:
-      "**Declaration Requirement:** You must include an AI_USAGE.md file detailing which tools were used and how outputs were integrated. You remain fully responsible for the accuracy of any AI-generated content.",
-  },
-};
-
-// @ts-ignore - gracefully fall back if staticContent isn't in template.json yet
-const staticContent = TEMPLATE.staticContent || DEFAULT_STATIC_CONTENT;
 
 const AI_CARD_STATES: Record<
   string,
@@ -106,80 +60,6 @@ const AI_CARD_STATES: Record<
 const INPUT =
   "w-full max-w-full box-border bg-slate-50 border border-slate-200 text-slate-900 rounded-lg px-3.5 py-2.5 text-sm outline-none transition-all hover:bg-white hover:border-slate-300 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400";
 
-const UG_GRADE_BANDS = [
-  {
-    key: "fail",
-    label: "Fail",
-    range: "<40%",
-    pill: "bg-red-100 text-red-700 border-red-200",
-  },
-  {
-    key: "pass",
-    label: "Pass",
-    range: "40–49%",
-    pill: "bg-orange-100 text-orange-700 border-orange-200",
-  },
-  {
-    key: "twoTwo",
-    label: "2:2",
-    range: "50–59%",
-    pill: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  },
-  {
-    key: "twoOne",
-    label: "2:1",
-    range: "60–69%",
-    pill: "bg-sky-100 text-sky-700 border-sky-200",
-  },
-  {
-    key: "first",
-    label: "1st",
-    range: "70–84%",
-    pill: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  },
-  {
-    key: "excelled",
-    label: "Excelled",
-    range: "85%+",
-    pill: "bg-violet-100 text-violet-700 border-violet-200",
-  },
-];
-
-const PGT_GRADE_BANDS = [
-  {
-    key: "fail",
-    label: "Fail",
-    range: "<50%",
-    pill: "bg-red-100 text-red-700 border-red-200",
-  },
-  {
-    key: "twoTwo",
-    label: "Pass",
-    range: "50–59%",
-    pill: "bg-orange-100 text-orange-700 border-orange-200",
-  },
-  {
-    key: "twoOne",
-    label: "Merit",
-    range: "60–69%",
-    pill: "bg-sky-100 text-sky-700 border-sky-200",
-  },
-  {
-    key: "first",
-    label: "Distinction",
-    range: "70–84%",
-    pill: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  },
-  {
-    key: "excelled",
-    label: "Exceptional",
-    range: "85%+",
-    pill: "bg-violet-100 text-violet-700 border-violet-200",
-  },
-];
-
-const gradeBandsFor = (scheme?: string) =>
-  scheme === "PGT" ? PGT_GRADE_BANDS : UG_GRADE_BANDS;
 
 const createRubricRow = (): RubricRow => ({
   id: Date.now(),
@@ -200,16 +80,20 @@ const AI_OPTIONS = [
 ];
 
 // Approval runs setter -> checker -> cluster lead, in that order.
-const WORKFLOW_STAGES = [
-  { id: "checker", label: "Checker", shortLabel: "Checker" },
-  { id: "cluster_lead", label: "Cluster lead", shortLabel: "Cluster lead" },
-] as const;
-
 const stageLabel = (stage: string) =>
   WORKFLOW_STAGES.find((item) => item.id === stage)?.label ??
   stage.replaceAll("_", " ");
 
-const ACADEMIC_YEAR_OPTIONS = ["2025-2026", "2026-2027", "2027-2028"];
+// An administrator can force-approve both stages so a brief blocked on an
+// unavailable reviewer can still be exported. Say so plainly rather than
+// letting it read as a genuine sign-off.
+const overrideNotice = (reviews: ReviewStatusRow[]) => {
+  const overridden = reviews.find((review) => review.overridden_by);
+  if (!overridden) return null;
+  const name = overridden.overridden_by_name || "an administrator";
+  return `Approvals were overridden by ${name}. Editing this brief will void the override.`;
+};
+
 type ModuleCode = keyof typeof MODULE_CATALOG.modules;
 
 const moduleValue = (code: string) => {
@@ -219,154 +103,10 @@ const moduleValue = (code: string) => {
 
 // ─── Helper Formatting Functions ──────────────────────────────────────────────
 
-const formatDateOnly = (dateString: string) => {
-  if (!dateString) return "";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return dateString;
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-};
 
-const formatDateTime = (dateString?: string, description?: string) => {
-  if (!dateString) return description || "";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return `${dateString} ${description || ""}`.trim();
-  const formattedDate = d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return description ? `${formattedDate} (${description})` : formattedDate;
-};
-
-const normaliseLoadedFormData = (
-  saved: unknown,
-  defaults: Record<string, unknown>,
-) => {
-  const source =
-    typeof saved === "object" && saved !== null
-      ? (saved as Record<string, unknown>)
-      : {};
-  const merged = { ...defaults, ...source };
-
-  if (!source.checkedBy && typeof source.setBy === "string") {
-    const [setBy, ...checkedByParts] = source.setBy.split(" / ");
-    if (checkedByParts.length > 0) {
-      merged.setBy = setBy.trim();
-      merged.checkedBy = checkedByParts.join(" / ").trim();
-    }
-  }
-
-  if (!source.submissionDate && Array.isArray(source.submissionDates)) {
-    const firstSubmission = source.submissionDates[0];
-    if (typeof firstSubmission === "object" && firstSubmission !== null) {
-      merged.submissionDate = String(
-        (firstSubmission as Record<string, unknown>).date || "",
-      );
-    }
-  }
-
-  if (!source.returnDate && typeof source.returnOfFeedback === "string") {
-    const parsedReturnDate = new Date(source.returnOfFeedback);
-    if (!Number.isNaN(parsedReturnDate.getTime())) {
-      merged.returnDate = parsedReturnDate.toISOString().slice(0, 10);
-    }
-  }
-
-  delete merged.submissionDates;
-  delete merged.returnOfFeedback;
-
-  if (!Object.prototype.hasOwnProperty.call(source, "academicYear")) {
-    const legacyProgramme = String(source.programme || "");
-    const legacyYear = legacyProgramme
-      .match(/20\d{2}\s*[-/]\s*20\d{2}/)?.[0]
-      .replace(/\s/g, "")
-      .replace("/", "-");
-
-    if (legacyYear && ACADEMIC_YEAR_OPTIONS.includes(legacyYear)) {
-      merged.academicYear = legacyYear;
-    }
-    if (legacyYear) {
-      merged.programme = legacyProgramme
-        .replace(/20\d{2}\s*[-/]\s*20\d{2}/, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-    }
-  }
-
-  return merged;
-};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const MarkdownRenderer = ({
-  content,
-  images,
-}: {
-  content: string;
-  images?: Record<string, string>;
-}) => {
-  return (
-    <div className="markdown-content text-[11pt] leading-relaxed text-black">
-      <style>{`.markdown-content::after { content: ""; display: table; clear: both; } .markdown-content img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }`}</style>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
-        urlTransform={(value: string) => value}
-        components={{
-          img: ({ node, src, alt, ...props }) => {
-            if (!src) return null;
-            let finalSrc = typeof src === "string" ? src : "";
-
-            if (
-              typeof src === "string" &&
-              src.startsWith("attachment:") &&
-              images
-            ) {
-              const imgId = src.replace("attachment:", "");
-              finalSrc = images[imgId] || src;
-            }
-
-            let finalAlt = alt || "";
-            let imgWidth: string | undefined = undefined;
-            let imgAlign = "center";
-            if (alt && typeof alt === "string" && alt.includes("|")) {
-              const parts = alt.split("|").map((p) => p.trim());
-              const lastPart = parts[parts.length - 1].toLowerCase();
-              if (["left", "right", "center"].includes(lastPart))
-                imgAlign = parts.pop() || "center";
-              if (parts.length > 1) imgWidth = parts.pop();
-              finalAlt = parts.join(" | ").trim();
-            }
-
-            const imgStyle: React.CSSProperties = { width: imgWidth };
-            if (imgAlign === "left") {
-              imgStyle.float = "left";
-              imgStyle.margin = "0.5rem 1.5rem 0.5rem 0";
-            } else if (imgAlign === "right") {
-              imgStyle.float = "right";
-              imgStyle.margin = "0.5rem 0 0.5rem 1.5rem";
-            } else {
-              imgStyle.display = "block";
-              imgStyle.margin = "1rem auto";
-            }
-
-            return (
-              <img src={finalSrc} alt={finalAlt} style={imgStyle} {...props} />
-            );
-          },
-        }}
-      >
-        {content || ""}
-      </ReactMarkdown>
-    </div>
-  );
-};
 
 function SectionHeading({ step, title }: { step: number; title: string }) {
   return (
@@ -429,48 +169,6 @@ function VisibilityToggle({
 }
 
 // ─── Default State Generator ──────────────────────────────────────────────────
-const getDefaultState = () => {
-  const data: Record<string, any> = {
-    assessmentType: "Prompt Portfolio",
-    gradingScheme: "UG",
-    coTaughtWeightingsEnabled: false,
-    coTaughtModules: [] as CoTaughtModule[],
-    groupWorkPermitted: "No",
-    groupSize: TEMPLATE.groupWorkDefault.size,
-    groupMechanics: TEMPLATE.groupWorkDefault.mechanics,
-    programme: "Computing Science BSc",
-    aiPolicy: "RED",
-    ...TEMPLATE.aiPolicyDefaults,
-  };
-  TEMPLATE.headerFields.forEach((f) => (data[f.id] = f.default));
-  TEMPLATE.contentSections.forEach((f) => (data[f.id] = f.defaultText));
-
-  const toggles: Record<string, boolean> = { gradingMatrix: true };
-  TEMPLATE.contentSections.forEach((f) => (toggles[f.id] = true));
-
-  const rubrics = [
-    {
-      id: Date.now(),
-      component: "Live Element (Demo)",
-      weight: "55%",
-      fail: "Core concepts misunderstood; tasks incomplete.",
-      pass: "Basic understanding demonstrated; bare minimum functionality shown.",
-      twoTwo:
-        "Fair understanding; mostly functional but with notable errors or gaps.",
-      twoOne: "Good understanding; solid execution with minor issues.",
-      first: "Excellent understanding; highly optimised.",
-      excelled: "Exceptional insight; flawless execution of edge cases.",
-    },
-  ];
-
-  return {
-    formData: data,
-    sectionToggles: toggles,
-    selectedSkills: [] as string[],
-    rubricRows: rubrics,
-    uploadedImages: {} as Record<string, string>,
-  };
-};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -535,16 +233,6 @@ export default function BriefGenerator() {
   const gradeBands = gradeBandsFor(formData.gradingScheme);
   const coTaughtModules = (formData.coTaughtModules ||
     []) as CoTaughtModule[];
-  const activeCoTaughtModules = formData.coTaughtWeightingsEnabled
-    ? coTaughtModules
-    : [];
-  const coTaughtMarkingSchemes = activeCoTaughtModules.filter(
-    (item) =>
-      item.markingSchemeEnabled && String(item.markingScheme || "").trim(),
-  );
-  const coTaughtGradingMatrices = activeCoTaughtModules.filter(
-    (item) => item.gradingMatrixEnabled && (item.rubricRows || []).length > 0,
-  );
   const currentEditorSignature = JSON.stringify({
     formData,
     sectionToggles,
@@ -599,18 +287,23 @@ export default function BriefGenerator() {
     setCheckerCandidates(data ?? []);
   }, []);
 
-  const refreshReviewStatus = useCallback(async (assessmentId: string) => {
-    if (!supabase) return;
-    const { data, error } = await supabase.rpc("assessment_review_status", {
-      target_assessment_id: assessmentId,
-    });
-    if (error) {
-      setPersistenceError(error.message);
-      setReviewStatuses([]);
-      return;
-    }
-    setReviewStatuses(data ?? []);
-  }, []);
+  const refreshReviewStatus = useCallback(
+    async (assessmentId: string): Promise<ReviewStatusRow[]> => {
+      if (!supabase) return [];
+      const { data, error } = await supabase.rpc("assessment_review_status", {
+        target_assessment_id: assessmentId,
+      });
+      if (error) {
+        setPersistenceError(error.message);
+        setReviewStatuses([]);
+        return [];
+      }
+      const rows = data ?? [];
+      setReviewStatuses(rows);
+      return rows;
+    },
+    [],
+  );
 
   const refreshAdminStatus = useCallback(async (userId: string) => {
     if (!supabase) return;
@@ -669,18 +362,12 @@ export default function BriefGenerator() {
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
-        setFormData(
-          normaliseLoadedFormData(parsed.formData, defaults.formData),
-        );
-        setSectionToggles({
-          ...defaults.sectionToggles,
-          ...(parsed.sectionToggles || {}),
-        });
-        setSelectedSkills(parsed.selectedSkills || defaults.selectedSkills);
-        setRubricRows(
-          parsed.rubricRows?.length ? parsed.rubricRows : defaults.rubricRows,
-        );
-        setUploadedImages(parsed.uploadedImages || defaults.uploadedImages);
+        const loaded = briefDocumentDataFromContent(parsed);
+        setFormData(loaded.formData);
+        setSectionToggles(loaded.sectionToggles);
+        setSelectedSkills(loaded.selectedSkills);
+        setRubricRows(loaded.rubricRows);
+        setUploadedImages(loaded.uploadedImages);
         setCheckerId(parsed.checkerId || "");
         setCurrentBriefId(parsed.currentBriefId || null);
       } catch (error) {
@@ -793,20 +480,13 @@ export default function BriefGenerator() {
       return;
     }
 
-    const content = brief.content as unknown as SavedBriefContent;
-    const loadedFormData = normaliseLoadedFormData(
-      content.formData,
-      defaults.formData,
-    );
-    const loadedSectionToggles = {
-      ...defaults.sectionToggles,
-      ...(content.sectionToggles || {}),
-    };
-    const loadedSkills = content.selectedSkills || defaults.selectedSkills;
-    const loadedRubrics = content.rubricRows?.length
-      ? content.rubricRows
-      : defaults.rubricRows;
-    const loadedImages = content.uploadedImages || defaults.uploadedImages;
+    const {
+      formData: loadedFormData,
+      sectionToggles: loadedSectionToggles,
+      selectedSkills: loadedSkills,
+      rubricRows: loadedRubrics,
+      uploadedImages: loadedImages,
+    } = briefDocumentDataFromContent(brief.content);
     const loadedCheckerId = brief.checker_id || "";
 
     hasHandledBriefLink.current = true;
@@ -828,7 +508,9 @@ export default function BriefGenerator() {
         checkerId: loadedCheckerId,
       }),
     );
-    void refreshReviewStatus(brief.id);
+    void refreshReviewStatus(brief.id).then((reviews) =>
+      setWorkflowMessage(overrideNotice(reviews)),
+    );
   }, [briefsList, isBriefsLoading, isClient, refreshReviewStatus]);
 
   // ALL HOOKS MUST BE DECLARED BEFORE ANY EARLY RETURNS
@@ -927,20 +609,13 @@ export default function BriefGenerator() {
   const handleLoadBrief = (briefId: string) => {
     const brief = briefsList.find((item) => item.id === briefId);
     if (!brief) return;
-    const content = brief.content as unknown as SavedBriefContent;
-    const loadedFormData = normaliseLoadedFormData(
-      content.formData,
-      defaults.formData,
-    );
-    const loadedSectionToggles = {
-      ...defaults.sectionToggles,
-      ...(content.sectionToggles || {}),
-    };
-    const loadedSkills = content.selectedSkills || defaults.selectedSkills;
-    const loadedRubrics = content.rubricRows?.length
-      ? content.rubricRows
-      : defaults.rubricRows;
-    const loadedImages = content.uploadedImages || defaults.uploadedImages;
+    const {
+      formData: loadedFormData,
+      sectionToggles: loadedSectionToggles,
+      selectedSkills: loadedSkills,
+      rubricRows: loadedRubrics,
+      uploadedImages: loadedImages,
+    } = briefDocumentDataFromContent(brief.content);
     const loadedCheckerId = brief.checker_id || "";
 
     setFormData(loadedFormData);
@@ -963,7 +638,9 @@ export default function BriefGenerator() {
       }),
     );
     setWorkflowMessage(null);
-    void refreshReviewStatus(brief.id);
+    void refreshReviewStatus(brief.id).then((reviews) =>
+      setWorkflowMessage(overrideNotice(reviews)),
+    );
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
@@ -1051,9 +728,13 @@ export default function BriefGenerator() {
       persistedFormData.customAssessmentDesc = null;
     }
 
+    if (formData.aiPolicy !== "RED") {
+      persistedFormData.aiRedRationale = null;
+    }
     if (formData.aiPolicy !== "AMBER") {
       persistedFormData.aiAmberPermitted = null;
       persistedFormData.aiAmberProhibited = null;
+      persistedFormData.aiAmberRationale = null;
     }
     if (formData.aiPolicy !== "GREEN") {
       persistedFormData.aiGreenPermitted = null;
@@ -1173,48 +854,7 @@ export default function BriefGenerator() {
   };
 
   const prepareWatermarksForPrint = () => {
-    const page = pdfPageRef.current;
-    if (!page) return;
-
-    const pixelsPerMillimetre = 96 / 25.4;
-    const printablePageHeight = 257 * pixelsPerMillimetre;
-    let pageCount = 1;
-    let usedHeight = 0;
-
-    Array.from(page.children).forEach((child) => {
-      if (!(child instanceof HTMLElement)) return;
-      if (
-        child.classList.contains("draft-watermark") ||
-        child.classList.contains("print-page-watermark")
-      )
-        return;
-
-      const styles = window.getComputedStyle(child);
-      const margins =
-        (Number.parseFloat(styles.marginTop) || 0) +
-        (Number.parseFloat(styles.marginBottom) || 0);
-      const elementHeight = child.offsetHeight + margins;
-      const avoidsPageBreak =
-        styles.breakInside === "avoid" || styles.pageBreakInside === "avoid";
-
-      if (
-        avoidsPageBreak &&
-        elementHeight <= printablePageHeight &&
-        usedHeight > 0 &&
-        usedHeight + elementHeight > printablePageHeight
-      ) {
-        pageCount += 1;
-        usedHeight = 0;
-      }
-
-      usedHeight += elementHeight;
-      while (usedHeight > printablePageHeight + 1) {
-        pageCount += 1;
-        usedHeight -= printablePageHeight;
-      }
-    });
-
-    setPrintPageCount(Math.max(1, pageCount));
+    setPrintPageCount(measurePrintPageCount(pdfPageRef.current));
   };
 
   const openPrintDialog = () => {
@@ -1247,7 +887,11 @@ export default function BriefGenerator() {
         "Approval is incomplete or has changed. This export contains the draft watermark.",
       );
     } else {
-      setWorkflowMessage(null);
+      // Re-read the stages before printing: the approval block goes onto the
+      // document, so it must name whoever actually signed off, and an
+      // administrator may have overridden since this page was loaded.
+      const reviews = await refreshReviewStatus(currentBriefId);
+      setWorkflowMessage(overrideNotice(reviews));
     }
 
     openPrintDialog();
@@ -1659,56 +1303,6 @@ export default function BriefGenerator() {
     </div>
   );
 
-  const renderPdfRubricTable = (
-    rows: RubricRow[],
-    bands: typeof UG_GRADE_BANDS,
-  ) => (
-    <table className="corporate-rubric-table table-fixed w-full text-left border-collapse border border-black text-[8pt] leading-tight mt-4 break-words">
-      <thead className="break-inside-avoid print:break-inside-avoid">
-        <tr className="print-bg-gray bg-gray-100 text-center border-b-2 border-black font-bold">
-          <th className="border-r border-black p-1.5 w-[14%]">Component</th>
-          <th className="border-r border-black p-1.5 w-[7%] text-[7pt]">
-            Weight
-          </th>
-          {bands.map((band, bandIndex) => (
-            <th
-              key={band.key}
-              className={`p-1.5 ${
-                bandIndex < bands.length - 1 ? "border-r border-black" : ""
-              }`}
-            >
-              {band.label} ({band.range})
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr
-            key={row.id}
-            className="border-b border-black align-top break-inside-avoid print:break-inside-avoid"
-          >
-            <td className="border-r border-black p-1.5 font-bold print-bg-gray-light bg-gray-50 break-words">
-              {row.component}
-            </td>
-            <td className="border-r border-black p-1.5 text-center font-bold print-bg-gray-light bg-gray-50">
-              {row.weight}
-            </td>
-            {bands.map((band, bandIndex) => (
-              <td
-                key={band.key}
-                className={`p-1.5 break-words ${
-                  bandIndex < bands.length - 1 ? "border-r border-black" : ""
-                }`}
-              >
-                {row[band.key]}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
 
   const renderSkillGroup = (category: "Transferable" | "Technical") => {
     const skills = SKILLS_LIST.filter((skill) => skill.category === category);
@@ -2205,29 +1799,36 @@ export default function BriefGenerator() {
                     const isBlocked =
                       review?.awaiting_previous_stage &&
                       review.state !== "approved";
+                    const isOverridden = Boolean(review?.overridden_by);
                     return (
                       <span
                         key={stage.id}
                         className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
-                          review?.state === "approved"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : review?.state === "changes_requested"
-                              ? "border-rose-200 bg-rose-50 text-rose-700"
-                              : isBlocked
-                                ? "border-slate-200 bg-slate-50 text-slate-500"
-                                : "border-amber-200 bg-amber-50 text-amber-700"
+                          isOverridden
+                            ? "border-amber-400 bg-emerald-50 text-emerald-800"
+                            : review?.state === "approved"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : review?.state === "changes_requested"
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : isBlocked
+                                  ? "border-slate-200 bg-slate-50 text-slate-500"
+                                  : "border-amber-200 bg-amber-50 text-amber-700"
                         }`}
                         title={
-                          review?.reviewer_name ||
-                          (stage.id === "checker"
-                            ? "No checker nominated yet"
-                            : "Awaiting a scoped cluster lead")
+                          isOverridden
+                            ? `Overridden by ${review?.overridden_by_name || "an administrator"}`
+                            : review?.reviewer_name ||
+                              (stage.id === "checker"
+                                ? "No checker nominated yet"
+                                : "Awaiting a scoped cluster lead")
                         }
                       >
                         {stage.shortLabel}:{" "}
-                        {review?.state === "pending" && isBlocked
-                          ? "waiting on checker"
-                          : review?.state?.replaceAll("_", " ") || "pending"}
+                        {isOverridden
+                          ? "overridden"
+                          : review?.state === "pending" && isBlocked
+                            ? "waiting on checker"
+                            : review?.state?.replaceAll("_", " ") || "pending"}
                       </span>
                     );
                   })}
@@ -3145,18 +2746,53 @@ $$`}</pre>
                 })}
               </div>
 
+              {formData.aiPolicy === "RED" && (
+                <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+                  <label className="block text-xs font-bold text-red-700 uppercase tracking-wide mb-1.5">
+                    Why AI cannot be used
+                  </label>
+                  <p className="mb-2 text-xs leading-5 text-red-700/80">
+                    Printed on the brief so students understand the reason for
+                    the ban rather than only being told about it.
+                  </p>
+                  <textarea
+                    className="w-full max-w-full box-border bg-white border border-red-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
+                    placeholder="e.g. This assessment measures your own ability to design and write algorithms from first principles, so any AI-generated work would not evidence the learning outcomes it is marked against."
+                    value={formData.aiRedRationale || ""}
+                    onChange={(e) =>
+                      handleChange("aiRedRationale", e.target.value)
+                    }
+                    onKeyDown={(e) =>
+                      handleTab(e, (val) => handleChange("aiRedRationale", val))
+                    }
+                  />
+                </div>
+              )}
               {formData.aiPolicy === "AMBER" && (
                 <div className="space-y-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
                   {[
                     { label: "Permitted Uses", field: "aiAmberPermitted" },
                     { label: "Prohibited Uses", field: "aiAmberProhibited" },
-                  ].map(({ label, field }) => (
+                    {
+                      label: "Why these restrictions apply",
+                      field: "aiAmberRationale",
+                      hint: "Printed on the brief so students understand the reason for the limits rather than only being told about them.",
+                      placeholder:
+                        "e.g. Debugging help is allowed because it mirrors professional practice, but the design work is prohibited because it is exactly what this assessment marks.",
+                    },
+                  ].map(({ label, field, hint, placeholder }) => (
                     <div key={field}>
                       <label className="block text-xs font-bold text-amber-700 uppercase tracking-wide mb-1.5">
                         {label}
                       </label>
+                      {hint && (
+                        <p className="mb-2 text-xs leading-5 text-amber-700/80">
+                          {hint}
+                        </p>
+                      )}
                       <textarea
                         className="w-full max-w-full box-border bg-white border border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-lg px-3.5 py-2.5 text-sm outline-none h-24 resize-y transition-all"
+                        placeholder={placeholder}
                         value={
                           (formData[
                             field as keyof typeof formData
@@ -3284,368 +2920,19 @@ $$`}</pre>
                 minHeight: `${(297 * zoom) / 100}mm`,
               }}
             >
-              <div
-                ref={pdfPageRef}
-                className="pdf-page corporate-document relative box-border bg-white text-black shrink-0 w-[210mm] min-h-[297mm] p-[20mm] shadow-[0_25px_60px_rgba(0,0,0,0.45)] print:w-[210mm] print:min-h-auto print:m-0 print:shadow-none print:block"
-                style={{
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: "top left",
-                }}
-              >
-                {!isApprovedForExport && (
-                  <>
-                    <div className="draft-watermark" aria-hidden="true">
-                      <span>DRAFT</span>
-                      <small>Approvals outstanding</small>
-                    </div>
-                    {Array.from({ length: printPageCount }, (_, pageIndex) => (
-                      <div
-                        key={pageIndex}
-                        className="print-page-watermark"
-                        style={{ top: `${128.5 + pageIndex * 257}mm` }}
-                        aria-hidden="true"
-                      >
-                        <span>DRAFT</span>
-                        <small>Approvals outstanding</small>
-                      </div>
-                    ))}
-                  </>
-                )}
-
-                {/* PDF Header */}
-                <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
-                  <img
-                    src="./UEA_Logo_BLK_MONO_N_A_59244.png"
-                    alt="University of East Anglia"
-                    className="corporate-document-logo"
-                  />
-                  <h1 className="text-3xl font-bold uppercase tracking-widest">
-                    {TEMPLATE.documentTitles?.institution ||
-                      "University of East Anglia"}
-                  </h1>
-                  <h2 className="text-[1.2rem] font-semibold mt-2">
-                    {formData.school}
-                  </h2>
-                </div>
-
-                {/* Details table (Dynamically mapped from JSON) */}
-                <table className="corporate-meta-table w-full text-left border-collapse border border-black mb-8 text-[11pt] break-inside-avoid print:break-inside-avoid">
-                  <tbody>
-                    {TEMPLATE.headerFields
-                      .filter((f) => f.id !== "school" && f.id !== "programme")
-                      .map((field, i) => (
-                        <tr
-                          key={i}
-                          className="border-b border-black print:break-inside-avoid"
-                        >
-                          <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                            {field.label}
-                          </th>
-                          <td className="py-2.5 px-4">
-                            {field.type === "date"
-                              ? formatDateOnly(formData[field.id] as string)
-                              : field.type === "datetime-local"
-                                ? formatDateTime(formData[field.id] as string)
-                                : (formData[field.id] as string)}
-                          </td>
-                        </tr>
-                      ))}
-                    {formData.coTaughtWeightingsEnabled &&
-                      (
-                        (formData.coTaughtModules || []) as CoTaughtModule[]
-                      ).map((item) => (
-                        <tr
-                          key={item.id}
-                          className="border-b border-black print:break-inside-avoid"
-                        >
-                          <th className="py-2.5 px-4 print-bg-gray-light bg-gray-100 w-[35%] border-r border-black font-semibold">
-                            Co-taught module / weighting
-                          </th>
-                          <td className="py-2.5 px-4">
-                            {item.module || "Module not specified"} —{" "}
-                            {item.weighting || "Weighting not specified"}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-
-                {/* Dynamic Content Sections Mapping */}
-                {TEMPLATE.pdfGroupOrder.map((groupTitle) => {
-                  const sectionsInGroup = TEMPLATE.contentSections.filter(
-                    (s) => s.pdfGroup === groupTitle,
-                  );
-                  const isEmployability = groupTitle === "Employability Skills";
-                  const isTaskSpec = groupTitle === "Task Specification";
-                  const isEvalGroup = groupTitle === "Evaluation & Grading";
-
-                  const hasVisibleDynamic = sectionsInGroup.some(
-                    (s) => sectionToggles[s.id] && formData[s.id],
-                  );
-                  const hasSkills =
-                    isEmployability && selectedSkills.length > 0;
-                  const hasGroupWork =
-                    isTaskSpec && formData.groupWorkPermitted === "Yes";
-                  const hasGradingMatrix =
-                    isEvalGroup &&
-                    sectionToggles.gradingMatrix &&
-                    rubricRows.length > 0;
-                  const hasModuleOverrides =
-                    isEvalGroup &&
-                    (coTaughtMarkingSchemes.length > 0 ||
-                      (sectionToggles.gradingMatrix &&
-                        coTaughtGradingMatrices.length > 0));
-
-                  if (
-                    !hasVisibleDynamic &&
-                    !hasSkills &&
-                    !hasGroupWork &&
-                    !hasGradingMatrix &&
-                    !hasModuleOverrides
-                  )
-                    return null;
-
-                  return (
-                    <div
-                      key={groupTitle}
-                      className="corporate-section mb-8 break-inside-avoid print:break-inside-avoid"
-                    >
-                      <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                        {groupTitle}
-                      </h3>
-
-                      {/* Special Injections based on Group */}
-                      {isTaskSpec && hasGroupWork && (
-                        <div className="mb-4">
-                          <strong>
-                            Group Mechanics (Target Size: {formData.groupSize}):
-                          </strong>{" "}
-                          <MarkdownRenderer
-                            content={formData.groupMechanics as string}
-                            images={uploadedImages}
-                          />
-                        </div>
-                      )}
-
-                      {/* Render standard configured sections */}
-                      {sectionsInGroup.map((s) => {
-                        if (!sectionToggles[s.id] || !formData[s.id])
-                          return null;
-                        return (
-                          <div key={s.id} className="mb-4">
-                            {s.pdfLabelStyle === "inline" && (
-                              <strong>{s.label}: </strong>
-                            )}
-                            {s.pdfLabelStyle === "heading" && (
-                              <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
-                                {s.label}:
-                              </h4>
-                            )}
-                            <MarkdownRenderer
-                              content={formData[s.id] as string}
-                              images={uploadedImages}
-                            />
-                          </div>
-                        );
-                      })}
-
-                      {isEmployability && hasSkills && (
-                        <div className="space-y-4 text-[11pt]">
-                          {(["Technical", "Transferable"] as const).map(
-                            (category) => {
-                              const skills = SKILLS_LIST.filter(
-                                (skill) =>
-                                  skill.category === category &&
-                                  selectedSkills.includes(skill.name),
-                              );
-                              if (skills.length === 0) return null;
-                              return (
-                                <div key={category}>
-                                  <h4 className="mb-1 font-bold">
-                                    {category} Skills
-                                  </h4>
-                                  <p>
-                                    {skills
-                                      .map((skill) => skill.name)
-                                      .join(", ")}
-                                  </p>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      )}
-
-                      {/* Special Injection for Grading Matrix at end of Evaluation block */}
-                      {hasGradingMatrix &&
-                        renderPdfRubricTable(rubricRows, gradeBands)}
-
-                      {/* Per-module marking schemes and grading matrices */}
-                      {isEvalGroup &&
-                        activeCoTaughtModules.map((item, index) => {
-                          const moduleMarkingScheme =
-                            item.markingSchemeEnabled &&
-                            String(item.markingScheme || "").trim()
-                              ? String(item.markingScheme)
-                              : "";
-                          const moduleRubricRows =
-                            sectionToggles.gradingMatrix &&
-                            item.gradingMatrixEnabled
-                              ? item.rubricRows || []
-                              : [];
-
-                          if (!moduleMarkingScheme && moduleRubricRows.length === 0)
-                            return null;
-
-                          const moduleLabel =
-                            item.module || `Co-taught module ${index + 1}`;
-
-                          return (
-                            <div
-                              key={item.id}
-                              className="mt-6 break-inside-avoid print:break-inside-avoid"
-                            >
-                              <h4 className="font-bold mt-5 mb-2 print:break-after-avoid">
-                                {moduleLabel}
-                                {item.weighting ? ` — ${item.weighting}` : ""}
-                              </h4>
-                              {moduleMarkingScheme && (
-                                <MarkdownRenderer
-                                  content={moduleMarkingScheme}
-                                  images={uploadedImages}
-                                />
-                              )}
-                              {moduleRubricRows.length > 0 &&
-                                renderPdfRubricTable(
-                                  moduleRubricRows,
-                                  gradeBandsFor(
-                                    item.gradingScheme ||
-                                      String(formData.gradingScheme || "UG"),
-                                  ),
-                                )}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  );
-                })}
-
-                {/* Academic Integrity */}
-                <div className="corporate-integrity mb-8 text-[11pt] leading-relaxed break-inside-avoid print:break-inside-avoid">
-                  <p className="corporate-warning font-bold text-center underline mb-4 uppercase tracking-wider print:break-after-avoid">
-                    {staticContent.academicIntegrity.warning}
-                  </p>
-                  <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-3 uppercase tracking-tight print:break-after-avoid">
-                    {staticContent.academicIntegrity.title}
-                  </h3>
-                  <MarkdownRenderer
-                    content={staticContent.academicIntegrity.body}
-                  />
-                  <div className="corporate-notice p-6 sm:p-8 box-border border-2 border-black print-bg-gray-light bg-gray-50 italic mt-4 print:p-6">
-                    {staticContent.academicIntegrity.groupWorkPrefix}{" "}
-                    <strong className="uppercase font-extrabold">
-                      {formData.groupWorkPermitted === "Yes"
-                        ? "PERMITTED"
-                        : "NOT PERMITTED"}
-                    </strong>
-                    .{" "}
-                    {formData.groupWorkPermitted === "Yes"
-                      ? "Collaboration is permitted only within your formally allocated group and must follow the group mechanics stated in this brief."
-                      : staticContent.academicIntegrity.individualWarning}
-                  </div>
-                </div>
-
-                {/* AI Policy */}
-                <div className="corporate-ai-section mb-8">
-                  <h3 className="corporate-section-title text-[14pt] font-bold border-b-2 border-black mb-4 uppercase tracking-tight print:break-after-avoid">
-                    {staticContent.aiPolicy.title}
-                  </h3>
-                  <p className="mb-4 text-[11pt] leading-relaxed">
-                    {staticContent.aiPolicy.preamble}
-                  </p>
-
-                  <div className="break-inside-avoid print:break-inside-avoid">
-                    <table className="corporate-ai-tiers table-fixed w-full border-collapse border border-black mb-5 font-bold text-center text-[11pt]">
-                      <tbody>
-                        <tr>
-                          <td
-                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "RED" ? "bg-red-200 print-bg-red" : ""}`}
-                          >
-                            🔴 RED {formData.aiPolicy === "RED" ? "✓" : ""}
-                          </td>
-                          <td
-                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "AMBER" ? "bg-yellow-200 print-bg-yellow" : ""}`}
-                          >
-                            🟡 AMBER {formData.aiPolicy === "AMBER" ? "✓" : ""}
-                          </td>
-                          <td
-                            className={`border border-black p-3 w-[33.3%] ${formData.aiPolicy === "GREEN" ? "bg-green-200 print-bg-green" : ""}`}
-                          >
-                            🟢 GREEN {formData.aiPolicy === "GREEN" ? "✓" : ""}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <div
-                      className="corporate-policy-box border-2 border-black p-6 sm:p-8 box-border print-bg-gray-light bg-gray-50/50 leading-relaxed text-[11pt] print:p-6"
-                      data-policy={formData.aiPolicy}
-                    >
-                      {formData.aiPolicy === "RED" && (
-                        <>
-                          <h4 className="font-bold text-red-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                            {staticContent.aiPolicy.redTitle}
-                          </h4>
-                          <MarkdownRenderer
-                            content={staticContent.aiPolicy.redBody}
-                          />
-                        </>
-                      )}
-                      {formData.aiPolicy === "AMBER" && (
-                        <>
-                          <h4 className="font-bold text-yellow-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                            {staticContent.aiPolicy.amberTitle}
-                          </h4>
-                          <p className="mb-3">
-                            {staticContent.aiPolicy.amberBody}
-                          </p>
-                          <p className="mb-2">
-                            <strong>Permitted Uses:</strong>{" "}
-                            {formData.aiAmberPermitted as string}
-                          </p>
-                          <p className="mb-3">
-                            <strong>Prohibited Uses:</strong>{" "}
-                            {formData.aiAmberProhibited as string}
-                          </p>
-                          <div className="italic">
-                            <MarkdownRenderer
-                              content={staticContent.aiPolicy.amberDeclaration}
-                            />
-                          </div>
-                        </>
-                      )}
-                      {formData.aiPolicy === "GREEN" && (
-                        <>
-                          <h4 className="font-bold text-green-800 mb-2 uppercase tracking-wide text-[12pt] print:break-after-avoid">
-                            {staticContent.aiPolicy.greenTitle}
-                          </h4>
-                          <p className="mb-3">
-                            {staticContent.aiPolicy.greenBody}
-                          </p>
-                          <p className="mb-3">
-                            <strong>Permitted Uses:</strong>{" "}
-                            {formData.aiGreenPermitted as string}
-                          </p>
-                          <div className="italic">
-                            <MarkdownRenderer
-                              content={staticContent.aiPolicy.greenDeclaration}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <BriefDocument
+                pageRef={pdfPageRef}
+                zoom={zoom}
+                formData={formData}
+                sectionToggles={sectionToggles}
+                selectedSkills={selectedSkills}
+                rubricRows={rubricRows}
+                uploadedImages={uploadedImages}
+                reviewStatuses={reviewStatuses}
+                isApproved={isApprovedForExport}
+                printPageCount={printPageCount}
+                version={currentSavedAssessment?.version}
+              />
             </div>
           </div>
         </div>

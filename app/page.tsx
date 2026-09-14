@@ -45,6 +45,7 @@ const REVIEW_STYLES: Record<string, string> = {
   unassigned: "bg-slate-300",
   pending: "bg-amber-400",
   approved: "bg-emerald-500",
+  overridden: "bg-emerald-500 ring-2 ring-amber-400",
   changes_requested: "bg-rose-500",
 };
 
@@ -363,7 +364,10 @@ export default function DashboardPage() {
     for (const assignment of assignments) {
       if (!STAGES.includes(assignment.stage as ReviewStage)) continue;
       const states = byAssessment.get(assignment.assessment_id);
-      if (states) states[assignment.stage as ReviewStage] = assignment.state;
+      if (states)
+        states[assignment.stage as ReviewStage] = assignment.overridden_by
+          ? "overridden"
+          : assignment.state;
     }
     return byAssessment;
   }, [assessments, assignments]);
@@ -440,7 +444,11 @@ export default function DashboardPage() {
       STAGES.some((stage) => states?.[stage] === "changes_requested")
     )
       return "Changes requested";
-    if (assessment.status === "approved") return "Ready to export";
+    if (assessment.status === "approved") {
+      return STAGES.some((stage) => states?.[stage] === "overridden")
+        ? "Ready to export (overridden)"
+        : "Ready to export";
+    }
     if (assessment.status === "in_review") {
       const approved = STAGES.filter(
         (stage) => states?.[stage] === "approved",

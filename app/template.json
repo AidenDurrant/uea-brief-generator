@@ -74,7 +74,9 @@
   "aiPolicyDefaults": {
     "aiAmberPermitted": "You may use AI to explain error messages or format references.",
     "aiAmberProhibited": "You MUST NOT use AI to generate application code or write technical reports.",
-    "aiGreenPermitted": "You may use AI tools to assist with coding, debugging, drafting, and architecture design."
+    "aiGreenPermitted": "You may use AI tools to assist with coding, debugging, drafting, and architecture design.",
+    "aiRedRationale": "",
+    "aiAmberRationale": ""
   },
   "groupWorkDefault": {
     "size": "3",
@@ -166,6 +168,7 @@
       "preamble": "To ensure fairness and clarity, this module uses a Traffic Light system to outline exactly how you can and cannot use generative AI tools for your assessment.",
       "redTitle": "🔴 RED: No Generative AI Permitted",
       "redBody": "The use of Generative AI tools (e.g., ChatGPT, GitHub Copilot, Claude, Gemini) is **strictly prohibited** for any part of this assessment.\n\n* All code, logic, and writing must be entirely your own creation.\n* Use of AI tools will be treated as academic misconduct.",
+      "rationaleTitle": "Why this restriction applies",
       "amberTitle": "🟡 AMBER: Restricted AI Usage Permitted",
       "amberBody": "Generative AI tools may be used for specific, restricted purposes within this assessment.",
       "amberDeclaration": "**Declaration Requirement:** You must explicitly document any allowed AI use. Failure to declare permitted use is considered academic misconduct.",
