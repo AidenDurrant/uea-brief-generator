@@ -20,7 +20,6 @@ import { AppHeader } from "@/app/components/app-header";
 import {
   BriefDocument,
   briefDocumentDataFromContent,
-  measurePrintPageCount,
 } from "@/app/components/brief-document";
 
 type QueueRow =
@@ -486,7 +485,6 @@ export default function ReviewPage() {
   const [hasOversight, setHasOversight] = useState(false);
   const [isDocumentOpen, setIsDocumentOpen] = useState(false);
   const [documentZoom, setDocumentZoom] = useState(70);
-  const [printPageCount, setPrintPageCount] = useState(1);
   const documentPageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -592,11 +590,6 @@ export default function ReviewPage() {
       active = false;
     };
   }, [assessmentId, authState]);
-
-  useEffect(() => {
-    if (!isDocumentOpen) return;
-    setPrintPageCount(measurePrintPageCount(documentPageRef.current));
-  }, [isDocumentOpen]);
 
   const assessmentRows = useMemo(
     () =>
@@ -849,7 +842,6 @@ export default function ReviewPage() {
       ),
     );
   const downloadDocument = () => {
-    setPrintPageCount(measurePrintPageCount(documentPageRef.current));
     window.requestAnimationFrame(() =>
       window.requestAnimationFrame(() => window.print()),
     );
@@ -1470,7 +1462,6 @@ export default function ReviewPage() {
                 uploadedImages={briefDocument.uploadedImages}
                 reviewStatuses={reviewStatuses}
                 isApproved={documentIsApproved}
-                printPageCount={printPageCount}
                 version={assessment.assessment_version}
               />
             </div>

@@ -284,10 +284,6 @@ export const getDefaultState = () => {
   };
 };
 
-// The browser will not repeat a fixed watermark across fragmented print pages,
-// so the document renders one absolutely positioned watermark per A4 page. That
-// needs a page count, which only the laid-out DOM can give us: walk the
-// document's children and accumulate their heights against the printable area.
 export type BriefDocumentData = {
   formData: Record<string, any>;
   sectionToggles: Record<string, boolean>;
@@ -335,50 +331,6 @@ export const briefDocumentDataFromContent = (
       : defaults.rubricRows) as RubricRow[],
     uploadedImages: saved.uploadedImages || defaults.uploadedImages,
   };
-};
-
-export const measurePrintPageCount = (page: HTMLElement | null) => {
-  if (!page) return 1;
-
-  const pixelsPerMillimetre = 96 / 25.4;
-  const printablePageHeight = 257 * pixelsPerMillimetre;
-  let pageCount = 1;
-  let usedHeight = 0;
-
-  Array.from(page.children).forEach((child) => {
-    if (!(child instanceof HTMLElement)) return;
-    if (
-      child.classList.contains("draft-watermark") ||
-      child.classList.contains("print-page-watermark")
-    )
-      return;
-
-    const styles = window.getComputedStyle(child);
-    const margins =
-      (Number.parseFloat(styles.marginTop) || 0) +
-      (Number.parseFloat(styles.marginBottom) || 0);
-    const elementHeight = child.offsetHeight + margins;
-    const avoidsPageBreak =
-      styles.breakInside === "avoid" || styles.pageBreakInside === "avoid";
-
-    if (
-      avoidsPageBreak &&
-      elementHeight <= printablePageHeight &&
-      usedHeight > 0 &&
-      usedHeight + elementHeight > printablePageHeight
-    ) {
-      pageCount += 1;
-      usedHeight = 0;
-    }
-
-    usedHeight += elementHeight;
-    while (usedHeight > printablePageHeight + 1) {
-      pageCount += 1;
-      usedHeight -= printablePageHeight;
-    }
-  });
-
-  return Math.max(1, pageCount);
 };
 
 export const MarkdownRenderer = ({
@@ -504,10 +456,8 @@ export type BriefDocumentProps = {
   uploadedImages: Record<string, string>;
   /** Review stages, for the approval block printed on a final export. */
   reviewStatuses: ReviewStatusRow[];
-  /** False renders the DRAFT watermark and suppresses the approval block. */
+  /** False suppresses the approval block. */
   isApproved: boolean;
-  /** How many A4 pages to stamp with a watermark; see measurePrintPageCount. */
-  printPageCount: number;
   version?: number;
   /** On-screen preview scale as a percentage; print always renders at 100. */
   zoom?: number;
@@ -522,7 +472,6 @@ export function BriefDocument({
   uploadedImages,
   reviewStatuses,
   isApproved,
-  printPageCount,
   version,
   zoom = 100,
   pageRef,
@@ -555,26 +504,6 @@ export function BriefDocument({
         transformOrigin: "top left",
       }}
     >
-      {!isApproved && (
-        <>
-          <div className="draft-watermark" aria-hidden="true">
-            <span>DRAFT</span>
-            <small>Approvals outstanding</small>
-          </div>
-          {Array.from({ length: printPageCount }, (_, pageIndex) => (
-            <div
-              key={pageIndex}
-              className="print-page-watermark"
-              style={{ top: `${128.5 + pageIndex * 257}mm` }}
-              aria-hidden="true"
-            >
-              <span>DRAFT</span>
-              <small>Approvals outstanding</small>
-            </div>
-          ))}
-        </>
-      )}
-
       {/* PDF Header */}
       <div className="corporate-masthead mb-8 border-b-[3px] border-black pb-4 text-center print:break-after-avoid">
         <img
@@ -921,8 +850,8 @@ export function BriefDocument({
         </div>
       </div>
 
-      {/* Approval record. Only on a final export — a watermarked
-          draft has nothing approved to attest to. */}
+      {/* Approval record. Only on a final export — an unapproved
+          draft has nothing to attest to. */}
       {isApproved && reviewStatuses.length > 0 && (
         <div className="mt-8 border border-black p-4 text-[10pt] break-inside-avoid print:break-inside-avoid">
           <h3 className="font-bold uppercase tracking-wide text-[12pt] mb-2">

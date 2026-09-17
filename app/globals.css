@@ -975,41 +975,6 @@ button {
     color: #14532d;
 }
 
-.draft-watermark {
-    position: absolute;
-    top: 43%;
-    left: 50%;
-    z-index: 50;
-    display: grid;
-    width: 150mm;
-    transform: translate(-50%, -50%) rotate(-30deg);
-    pointer-events: none;
-    place-items: center;
-    color: rgba(153, 27, 27, 0.14);
-    text-align: center;
-    text-transform: uppercase;
-}
-
-.print-page-watermark {
-    display: none;
-}
-
-.draft-watermark span,
-.print-page-watermark span {
-    font-size: 58pt;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: 0.12em;
-}
-
-.draft-watermark small,
-.print-page-watermark small {
-    margin-top: 8px;
-    font-size: 13pt;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-}
-
 /* --- Print Styles --- */
 @media print {
     @page {
@@ -1042,27 +1007,6 @@ button {
     }
     .print-bg-green {
         background-color: #bbf7d0 !important;
-    }
-
-    /* The browser does not reliably repeat fixed elements across fragmented
-       print pages. Render one absolutely positioned watermark per A4 content
-       page instead; these are real print elements, not page backgrounds. */
-    .draft-watermark {
-        display: none !important;
-    }
-
-    .print-page-watermark {
-        position: absolute !important;
-        left: 50% !important;
-        z-index: 9999 !important;
-        display: grid !important;
-        width: 150mm;
-        transform: translate(-50%, -50%) rotate(-30deg);
-        pointer-events: none;
-        place-items: center;
-        color: rgba(153, 27, 27, 0.14) !important;
-        text-align: center;
-        text-transform: uppercase;
     }
 
     /* Remove the web preview container constraints */

@@ -13,7 +13,6 @@ import {
   briefDocumentDataFromContent,
   getDefaultState,
   gradeBandsFor,
-  measurePrintPageCount,
   type CoTaughtModule,
   type RubricRow,
 } from "@/app/components/brief-document";
@@ -182,7 +181,6 @@ export default function BriefGenerator() {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfPageRef = useRef<HTMLDivElement>(null);
   const hasHandledBriefLink = useRef(false);
-  const [printPageCount, setPrintPageCount] = useState(1);
 
   // Supabase authentication and persistence state
   const [briefsList, setBriefsList] = useState<Assessment[]>([]);
@@ -853,12 +851,9 @@ export default function BriefGenerator() {
     ]);
   };
 
-  const prepareWatermarksForPrint = () => {
-    setPrintPageCount(measurePrintPageCount(pdfPageRef.current));
-  };
-
+  // Let React commit the approval block before the print dialog snapshots the
+  // page; it is rendered from state set immediately before this call.
   const openPrintDialog = () => {
-    prepareWatermarksForPrint();
     window.requestAnimationFrame(() =>
       window.requestAnimationFrame(() => window.print()),
     );
@@ -884,7 +879,7 @@ export default function BriefGenerator() {
     setExportApprovalOverride(fullyApproved);
     if (!fullyApproved) {
       setWorkflowMessage(
-        "Approval is incomplete or has changed. This export contains the draft watermark.",
+        "Approval is incomplete or has changed. This export is not a final approved brief.",
       );
     } else {
       // Re-read the stages before printing: the approval block goes onto the
@@ -2930,7 +2925,6 @@ $$`}</pre>
                 uploadedImages={uploadedImages}
                 reviewStatuses={reviewStatuses}
                 isApproved={isApprovedForExport}
-                printPageCount={printPageCount}
                 version={currentSavedAssessment?.version}
               />
             </div>
