@@ -391,7 +391,7 @@ button {
     background: #818cf8;
 }
 
-@media (max-width: 1200px) {
+@media screen and (max-width: 1200px) {
     .editor-content {
         padding: 28px 24px 72px !important;
     }
@@ -406,7 +406,7 @@ button {
     }
 }
 
-@media (max-width: 900px) {
+@media screen and (max-width: 900px) {
     .app-shell {
         position: relative;
     }
@@ -439,7 +439,7 @@ button {
     }
 }
 
-@media (max-width: 640px) {
+@media screen and (max-width: 640px) {
     .editor-toolbar {
         min-height: 62px;
         padding: 10px 12px !important;
@@ -1007,6 +1007,18 @@ button {
     }
     .print-bg-green {
         background-color: #bbf7d0 !important;
+    }
+
+    /* Neutralise the layout shells so the document can fragment across pages */
+    .app-shell,
+    .workspace-shell,
+    .preview-panel {
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
     }
 
     /* Remove the web preview container constraints */

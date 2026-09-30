@@ -1639,7 +1639,7 @@ export default function BriefGenerator() {
 
       <div
         ref={containerRef}
-        className="workspace-shell flex-1 flex overflow-hidden bg-white relative"
+        className="workspace-shell flex-1 flex overflow-hidden bg-white relative print:block print:h-auto print:overflow-visible"
       >
         {/* ═══════════════════════════════════════════════════════════
             LEFT — Editor
@@ -1711,6 +1711,7 @@ export default function BriefGenerator() {
                 <button
                   type="button"
                   onClick={() => void handleExportPdf()}
+                  title="Opens your browser’s print dialog. Choose “Save as PDF”, then untick “Headers and footers” under More settings to keep the date, page number and web address off the brief."
                   className="toolbar-action toolbar-action-muted flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-500 transition-colors active:scale-95"
                 >
                   <svg

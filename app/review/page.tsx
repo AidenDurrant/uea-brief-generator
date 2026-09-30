@@ -1431,6 +1431,7 @@ export default function ReviewPage() {
               <button
                 type="button"
                 onClick={downloadDocument}
+                title="Opens your browser’s print dialog. Choose “Save as PDF”, then untick “Headers and footers” under More settings to keep the date, page number and web address off the brief."
                 className="inline-flex min-h-9 items-center rounded-full bg-white px-4 text-xs font-bold text-slate-900 hover:bg-slate-200"
               >
                 Download PDF
